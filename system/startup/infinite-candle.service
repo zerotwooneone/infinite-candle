@@ -1,0 +1,15 @@
+﻿[Unit]
+Description=Infinite Candle LED Service
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=pi
+Group=root
+WorkingDirectory=/home/pi/infinite-candle/lights-control/src
+ExecStart=/usr/bin/python3 /home/pi/infinite-candle/lights-control/src/main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
