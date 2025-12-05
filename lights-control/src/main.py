@@ -77,3 +77,61 @@ async def root():
         </body>
     </html>
     """
+@app.post("/debug/{mode}")
+async def debug_mode(mode: str):
+    """
+    Modes: 'white', 'red', 'green', 'blue', 'off'
+    """
+    layers = []
+
+    if mode == "white":
+        # CAUTION: Max Power Draw
+        layers.append({"type": "solid", "color": [255, 255, 255]})
+
+    elif mode == "red":
+        layers.append({"type": "solid", "color": [255, 0, 0]})
+
+    elif mode == "green":
+        layers.append({"type": "solid", "color": [0, 255, 0]})
+
+    elif mode == "blue":
+        layers.append({"type": "solid", "color": [0, 0, 255]})
+
+    elif mode == "off":
+        # Send empty layer list or black layer
+        layers.append({"type": "solid", "color": [0, 0, 0]})
+
+    else:
+        return {"error": "Unknown mode. Use: white, red, green, blue, off"}
+
+    # Push to engine
+    engine.update_layers(layers)
+    return {"status": f"Debug Mode: {mode}"}
+
+@app.post("/debug/identify")
+async def debug_identify():
+    """
+    Runs a slow animation to help identify strip direction.
+    """
+    # This is a 'special' blocking test that overrides the engine loop briefly
+    # In a real system we'd make this a 'Layer', but for quick testing:
+
+    green = [0, 255, 0]
+    off = [0, 0, 0]
+
+    # Flash first 10 pixels to identify the START
+    layers = [{"type": "solid", "color": off}] # clear
+    engine.update_layers(layers)
+
+    # We manually hijack the buffer for a second (Dirty but effective for identifying)
+    # Ideally, you just create a "Chase" effect in the engine.
+    # For now, let's just set the bottom 5% to Green
+    layers = [{
+        "type": "solid",
+        "color": green,
+        "h_min": 0.0,
+        "h_max": 0.05
+    }]
+    engine.update_layers(layers)
+
+    return {"status": "Highlighting bottom 5% (The Start)"}
