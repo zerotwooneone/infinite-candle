@@ -57,10 +57,6 @@ async def set_scene(scene: SceneRequest):
 async def get_status():
     return {"running": engine.running, "led_count": engine.driver.count}
 
-# Entry point for debugging
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -135,3 +131,8 @@ async def debug_identify():
     engine.update_layers(layers)
 
     return {"status": "Highlighting bottom 5% (The Start)"}
+
+# Entry point for debugging
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
