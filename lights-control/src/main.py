@@ -73,37 +73,6 @@ async def root():
         </body>
     </html>
     """
-@app.post("/debug/{mode}")
-async def debug_mode(mode: str):
-    """
-    Modes: 'white', 'red', 'green', 'blue', 'off'
-    """
-    layers = []
-
-    if mode == "white":
-        # CAUTION: Max Power Draw
-        layers.append({"type": "solid", "color": [255, 255, 255]})
-
-    elif mode == "red":
-        layers.append({"type": "solid", "color": [255, 0, 0]})
-
-    elif mode == "green":
-        layers.append({"type": "solid", "color": [0, 255, 0]})
-
-    elif mode == "blue":
-        layers.append({"type": "solid", "color": [0, 0, 255]})
-
-    elif mode == "off":
-        # Send empty layer list or black layer
-        layers.append({"type": "solid", "color": [0, 0, 0]})
-
-    else:
-        return {"error": "Unknown mode. Use: white, red, green, blue, off"}
-
-    # Push to engine
-    engine.update_layers(layers)
-    return {"status": f"Debug Mode: {mode}"}
-
 @app.post("/debug/identify")
 async def debug_identify():
     """
@@ -146,6 +115,37 @@ async def debug_identify_face(face: int):
     }]
     engine.update_layers(layers)
     return {"status": f"Highlighting Face {face}"}
+
+@app.post("/debug/{mode}")
+async def debug_mode(mode: str):
+    """
+    Modes: 'white', 'red', 'green', 'blue', 'off'
+    """
+    layers = []
+
+    if mode == "white":
+        # CAUTION: Max Power Draw
+        layers.append({"type": "solid", "color": [255, 255, 255]})
+
+    elif mode == "red":
+        layers.append({"type": "solid", "color": [255, 0, 0]})
+
+    elif mode == "green":
+        layers.append({"type": "solid", "color": [0, 255, 0]})
+
+    elif mode == "blue":
+        layers.append({"type": "solid", "color": [0, 0, 255]})
+
+    elif mode == "off":
+        # Send empty layer list or black layer
+        layers.append({"type": "solid", "color": [0, 0, 0]})
+
+    else:
+        return {"error": "Unknown mode. Use: white, red, green, blue, off"}
+
+    # Push to engine
+    engine.update_layers(layers)
+    return {"status": f"Debug Mode: {mode}"}
 
 # Entry point for debugging
 if __name__ == "__main__":
