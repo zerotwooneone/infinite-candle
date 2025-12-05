@@ -132,6 +132,21 @@ async def debug_identify():
 
     return {"status": "Highlighting bottom 5% (The Start)"}
 
+@app.post("/debug/identify/{face}")
+async def debug_identify_face(face: int):
+    """
+    Lights up a specific side of the pillar (0, 1, 2, or 3)
+    """
+    layers = [{
+        "type": "solid",
+        "color": [0, 0, 255],  # Blue
+        "faces": [face],       # Only this specific face
+        "h_min": 0.0,
+        "h_max": 1.0
+    }]
+    engine.update_layers(layers)
+    return {"status": f"Highlighting Face {face}"}
+
 # Entry point for debugging
 if __name__ == "__main__":
     import uvicorn
