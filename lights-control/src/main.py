@@ -3,6 +3,7 @@ import threading
 from fastapi import FastAPI
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from fastapi.responses import HTMLResponse
 
 from src.engine.compositor import Engine
 
@@ -60,3 +61,19 @@ async def get_status():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    return """
+    <html>
+        <head>
+            <title>Infinite Candle</title>
+            <style>body{font-family:sans-serif; text-align:center; padding:50px; background:#111; color:#eee;}</style>
+        </head>
+        <body>
+            <h1>🕯️ Infinite Candle is Online</h1>
+            <p>The engine is running.</p>
+            <a href="/docs" style="color:#4af; font-size:1.5em;">Open Control Panel</a>
+        </body>
+    </html>
+    """
