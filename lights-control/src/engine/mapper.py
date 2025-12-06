@@ -1,37 +1,23 @@
-﻿# lights-control/src/engine/mapper.py
-import numpy as np
-from src.config import LED_COUNT, PILLAR_WRAPS, PILLAR_FACES
+﻿import numpy as np
+from src.config import LED_COUNT, PILLAR_WRAPS
 
 class PillarMapper:
     def __init__(self):
+        # Pre-calculate coordinates for all LEDs
+        # x = Azimuth (0.0 to 1.0 around the cylinder)
+        # y = Height (0.0 to 1.0 from bottom to top)
+
+        indices = np.arange(LED_COUNT)
         self.leds_per_wrap = LED_COUNT / PILLAR_WRAPS
-        self.leds_per_face = self.leds_per_wrap / PILLAR_FACES
 
-    def get_indices_for_region(self, faces: list[int], min_h: float, max_h: float):
-        """
-        Returns a boolean mask (numpy array) of LEDs that fall inside the requested region.
-        
-        faces: list of integers [0, 1, 2, 3]
-        min_h: 0.0 (bottom) to 1.0 (top)
-        max_h: 0.0 (bottom) to 1.0 (top)
-        """
-        # Create an array of all LED indices [0, 1, ... 599]
-        all_indices = np.arange(LED_COUNT)
+        # Height is simple linear progression
+        self.coords_y = indices / LED_COUNT
 
-        # Calculate the "Height" of every pixel (0.0 to 1.0)
-        # Pixel 0 is height 0.0, Pixel 600 is height 1.0
-        pixel_heights = all_indices / LED_COUNT
+        # X is the remainder of the spiral
+        # 0.0 = Front, 0.5 = Back, 0.99 = Front again
+        self.coords_x = (indices % self.leds_per_wrap) / self.leds_per_wrap
 
-        # Calculate the "Face" of every pixel
-        # This is a modulo operation. 
-        # If a wrap is 24 pixels, pixels 0-5 are Face 0, 6-11 are Face 1, etc.
-        # We calculate "how far along the current wrap are we?"
-        position_in_wrap = all_indices % self.leds_per_wrap
-        pixel_faces = (position_in_wrap / self.leds_per_face).astype(int)
-
-        # Create Boolean Masks
-        height_mask = (pixel_heights >= min_h) & (pixel_heights <= max_h)
-        face_mask = np.isin(pixel_faces, faces)
-
-        # Combine
-        return height_mask & face_mask
+        # Aspect Ratio (Height / Circumference)
+        # 48 inches tall / 21 inches circumference ≈ 2.28
+        # We need this so a 45-degree line actually looks 45 degrees
+        self.aspect_ratio = 48.0 / 21.0
