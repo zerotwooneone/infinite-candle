@@ -4,10 +4,21 @@ After=network.target sound.target
 
 [Service]
 Type=simple
-User=pi
+# 1. MUST be root to access hardware PWM (/dev/mem)
+User=root
 Group=root
-WorkingDirectory=/home/pi/infinite-candle/lights-control/src
-ExecStart=/usr/bin/python3 /home/pi/infinite-candle/lights-control/src/main.py
+
+# 2. Set working directory so relative paths work
+WorkingDirectory=/home/pi/infinite-candle/lights-control
+
+# 3. CRITICAL: Use the python binary INSIDE the .venv folder
+#    We also use '-m src.main' to resolve the import paths correctly
+ExecStart=/home/pi/infinite-candle/lights-control/.venv/bin/python -m src.main
+
+# 4. Environment variables (optional, but good for safety)
+Environment="PATH=/home/pi/infinite-candle/lights-control/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
 Restart=on-failure
 RestartSec=5
 
