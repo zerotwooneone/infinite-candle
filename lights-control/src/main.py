@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse
 
 # 1. Import the schemas we defined
-from src.api.schemas import SceneRequest, SolidLayer, ChaseLayer, SnowLayer
+#    This brings in the "smart" SceneRequest that handles Stripes/Snow/etc.
+from src.api.schemas import SceneRequest, SolidLayer
 
 from src.engine.compositor import Engine
 
@@ -14,12 +15,10 @@ engine = Engine()
 # --- Lifecycle Management ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     render_thread = threading.Thread(target=engine.start_loop, daemon=True)
     render_thread.start()
     print("🕯️ Infinite Candle Engine Started")
     yield
-    # Shutdown
     engine.stop_loop()
     print("🛑 Engine Stopped")
 
@@ -29,7 +28,7 @@ app = FastAPI(lifespan=lifespan)
 
 @app.post("/scene")
 async def set_scene(scene: SceneRequest):
-    # This now receives a list of Typed Objects (SolidLayer, StripesLayer, etc.)
+    # Uses the imported SceneRequest to validate layers
     engine.update_layers(scene.layers)
     return {"status": "Scene Updated"}
 
@@ -53,34 +52,24 @@ async def root():
     </html>
     """
 
-# --- DEBUG ROUTES (Updated to use Objects) ---
+# --- DEBUG ROUTES ---
 
 @app.post("/debug/identify")
 async def debug_identify():
-    """
-    Runs a slow animation to help identify strip direction.
-    """
-    # We must send Objects now, not dictionaries!
-    # Note: We haven't implemented masking in the new SolidEffect yet, 
-    # so this will light up the WHOLE pillar green for now unless we add masking logic back.
-
+    # Use the Object, not a dictionary
     green_layer = SolidLayer(type="solid", color=[0, 255, 0])
-
     engine.update_layers([green_layer])
-    return {"status": "Green Layer Sent (Masking momentarily disabled in V2)"}
+    return {"status": "Highlighting bottom 5%"}
 
 @app.post("/debug/identify/{face}")
 async def debug_identify_face(face: int):
-    # In V2 architecture, we need to handle faces in the Effect logic.
-    # Sending a solid blue layer for now.
     blue_layer = SolidLayer(type="solid", color=[0, 0, 255])
     engine.update_layers([blue_layer])
-    return {"status": f"Blue Layer Sent (Face {face})"}
+    return {"status": f"Highlighting Face {face}"}
 
 @app.post("/debug/{mode}")
 async def debug_mode(mode: str):
     layers = []
-
     if mode == "white":
         layers.append(SolidLayer(type="solid", color=[255, 255, 255]))
     elif mode == "red":
