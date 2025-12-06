@@ -9,6 +9,7 @@ from src.engine.compositor import Engine
 
 # --- Data Models ---
 class LayerModel(BaseModel):
+    model_config = ConfigDict(extra='allow')
     type: str
     color: list[int]
     faces: list[int] = [0, 1, 2, 3]
