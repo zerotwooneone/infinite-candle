@@ -1,4 +1,5 @@
-from typing import Literal, List, Union, Annotated, Optional
+# src/api/schemas.py
+from typing import Literal, List, Union, Annotated
 from pydantic import BaseModel, Field
 
 # --- Base ---
@@ -20,9 +21,9 @@ class StripesLayer(BaseLayer):
     type: Literal["stripes"]
     color_a: List[int] = [0, 0, 0]
     color_b: List[int] = [255, 255, 255]
-    angle: float = 0.0      # 0 = Horizontal, 90 = Vertical
-    width: float = 0.2      # Stripe thickness
-    speed: float = 1.0      # Scroll speed
+    angle: float = 0.0
+    width: float = 0.2
+    speed: float = 1.0
 
 class SnowLayer(BaseLayer):
     type: Literal["snow"]
@@ -30,10 +31,12 @@ class SnowLayer(BaseLayer):
     flake_count: int = 40
     gravity: float = 0.5
 
-# --- The Union ---
-# The 'discriminator' tells Pydantic to look at the 'type' field 
-# to decide which class to instantiate.
-EffectConfig = Annotated[Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer], Field(discriminator="type")]
+# --- The Union (The Critical Part) ---
+# Ensure ALL layer types (Solid, Chase, Stripes, Snow) are listed here!
+EffectConfig = Annotated[
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer],
+    Field(discriminator="type")
+]
 
 class SceneRequest(BaseModel):
     layers: List[EffectConfig]
