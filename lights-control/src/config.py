@@ -11,7 +11,7 @@ LED_INVERT = True
 LED_CHANNEL = 0
 
 # Geometry Settings
-PILLAR_WRAPS = 19.3        # How many times the strip circles the pillar
+PILLAR_WRAPS = 19.4        # How many times the strip circles the pillar
 PILLAR_FACES = 4         # Square pillar
 
 # Simulation Mode
