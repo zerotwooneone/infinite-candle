@@ -1,10 +1,12 @@
-# src/api/schemas.py
 from typing import Literal, List, Union, Annotated
 from pydantic import BaseModel, Field
 
 # --- Base ---
 class BaseLayer(BaseModel):
     opacity: float = 1.0
+    # RESTORED: These now apply to ALL layers
+    h_min: float = 0.0
+    h_max: float = 1.0
 
 # --- Effect Configs ---
 class SolidLayer(BaseLayer):
@@ -29,18 +31,19 @@ class SnowLayer(BaseLayer):
     type: Literal["snow"]
     color: List[int] = [200, 200, 255]
     flake_count: int = 40
-    gravity: float = 0.5
+    gravity: float = 0.05
 
-class FireLayer(BaseModel):
+class FireLayer(BaseLayer):
     type: Literal["fire"]
-    opacity: float = 1.0
-    wax_height: float = 0.15     # How much of the bottom is solid wax?
-    cooling: float = 0.15        # How fast fire fades as it rises
-    sparking: float = 0.3        # How vigorously it flickers at the base
+    cooling: float = 0.15
+    sparking: float = 0.3
+    # NEW: Custom Color Gradient (Start -> End)
+    color_start: List[int] = [255, 0, 0]    # Red
+    color_end: List[int] = [255, 255, 0]    # Yellow
 
 # --- The Union ---
 EffectConfig = Annotated[
-    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer], # <--- Add FireLayer
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer],
     Field(discriminator="type")
 ]
 
