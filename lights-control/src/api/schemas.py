@@ -41,9 +41,16 @@ class FireLayer(BaseLayer):
     color_start: List[int] = [255, 0, 0]    # Red
     color_end: List[int] = [255, 255, 0]    # Yellow
 
+class FireworkLayer(BaseModel):
+    type: Literal["fireworks"]
+    opacity: float = 1.0
+    launch_rate: float = 0.5    # Rockets per second
+    burst_height: float = 0.8   # Average height of explosion (0.0 - 1.0)
+    explosion_size: float = 0.15 # How wide the burst spreads
+
 # --- The Union ---
 EffectConfig = Annotated[
-    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer],
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer, FireworkLayer], # <--- Add FireworkLayer
     Field(discriminator="type")
 ]
 
