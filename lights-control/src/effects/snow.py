@@ -7,16 +7,22 @@ class SnowEffect(Effect):
     def __init__(self, config):
         super().__init__(config)
         self.count = config.flake_count
-        # State: Each flake has a position [strip_index, precise_height]
-        # Since it's a 1D strip, we just track index (0-600) as float
+
+        # State: Each flake has a position [strip_index]
         self.positions = np.random.uniform(0, LED_COUNT, self.count)
-        self.speeds = np.random.uniform(config.fall_speed * 0.8, config.fall_speed * 1.2, self.count)
+
+        # FIX: Use 'config.gravity', not 'config.fall_speed'
+        base_speed = config.gravity
+
+        # Randomize speed slightly for realism
+        self.speeds = np.random.uniform(base_speed * 0.8, base_speed * 1.2, self.count)
+
         self.color = np.array(config.color, dtype=np.uint8)
 
     def update(self, dt: float):
         # Physics: Move every flake down
-        # Note: On a spiral, "Down" means decreasing index
-        self.positions -= self.speeds * (dt * 60) # Scale for 60fps
+        # We multiply by 60 so that 'gravity=1.0' means roughly 60 pixels per second
+        self.positions -= self.speeds * (dt * 60)
 
         # Reset flakes that hit the bottom
         for i in range(self.count):
@@ -29,4 +35,3 @@ class SnowEffect(Effect):
             if 0 <= idx < len(buffer):
                 # Draw the flake
                 buffer[idx] = self.color
-                # Optional: Add a faint trail pixel above it
