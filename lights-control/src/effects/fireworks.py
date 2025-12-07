@@ -15,11 +15,11 @@ class FireworkEffect(ParticleSystem):
 
         # --- STATE MANAGEMENT ---
         # 0=Dead, 1=Rocket, 2=Spark
-        self.state = np.zeros(self.max_particles, dtype=int)
-        self.spark_type = np.zeros(self.max_particles, dtype=int)
+        self.state = np.zeros(self.count, dtype=int)
+        self.spark_type = np.zeros(self.count, dtype=int)
 
         # Colors (N, 3)
-        self.colors = np.zeros((self.max_particles, 3), dtype=np.uint8)
+        self.colors = np.zeros((self.count, 3), dtype=np.uint8)
 
     def spawn_rocket(self):
         # Find 1 dead slot
