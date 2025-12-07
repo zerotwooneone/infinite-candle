@@ -1,20 +1,15 @@
 import numpy as np
 import random
-from src.effects.abstract import Effect
+from src.effects.particle_system import ParticleSystem
 
-class FireworkEffect(Effect):
+class FireworkEffect(ParticleSystem):
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__(config, particle_count=400)
 
         # --- CONFIGURATION ---
         self.launch_rate = config.launch_rate
         self.launch_timer = 0.0
         self.target_height = config.burst_height
-
-        # --- PARTICLE POOL (The "Memory Bank") ---
-        # We allocate 400 particles total.
-        # Rockets use 1 slot. Explosions use ~50 slots.
-        self.max_particles = 400
 
         # POSITIONS
         self.y = np.zeros(self.max_particles)
