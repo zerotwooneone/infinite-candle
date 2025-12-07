@@ -4,7 +4,7 @@ from src.config import LED_COUNT
 
 # --- CONFIGURATION ---
 # Toggle this to False if you want hard, crisp pixels only
-ENABLE_BLOOM = True
+ENABLE_BLOOM = False
 BLOOM_RADIUS = 0.02   # How wide is the soft glow? (0.0 to 1.0)
 BLOOM_BRIGHTNESS = 0.3 # Brightness of the ring relative to core (0.0 to 1.0)
 
@@ -16,7 +16,7 @@ class SnowEffect(Effect):
 
         # --- PHYSICS CONSTANTS ---
         # We default wind to 0.1 (slight rotation) if not in config
-        self.gravity = getattr(config, 'gravity', 0.5)
+        self.gravity = getattr(config, 'gravity', 0.3)
         self.wind_speed = getattr(config, 'wind', 0.05)
         self.turbulence_magnitude = 0.2 # How chaotic is the air?
 
