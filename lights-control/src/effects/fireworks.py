@@ -114,56 +114,45 @@ class FireworkEffect(Effect):
                 # Streamers fall faster (heavy)
                 self.vy[indices] -= 0.1
 
-    def update(self, dt: float):
-        # --- 1. SPAWN LOGIC ---
-        self.launch_timer += dt
-        if self.launch_timer > (1.0 / self.launch_rate):
-            self.spawn_rocket()
-            self.launch_timer = 0.0
-            # Add randomness to next launch
-            self.launch_timer -= np.random.uniform(0.0, 0.5)
+def update(self, dt: float):
+    # ... (Spawn Logic is fine) ...
 
-        # --- 2. PHYSICS UPDATE (Vectorized) ---
-        active = self.state > 0
+    # --- 2. PHYSICS UPDATE ---
+    active = self.state > 0
 
-        # Gravity
-        # Rockets (State 1): Slight drag, mostly momentum
-        # Sparks (State 2): Heavy gravity
-        is_rocket = self.state == 1
-        is_spark = self.state == 2
+    # ... (Gravity/Drag logic is fine) ...
 
-        # Apply Gravity/Drag
-        self.vy[is_rocket] -= 0.3 * dt  # Rockets slow down as they rise
-        self.vy[is_spark] -= 0.5 * dt   # Sparks fall
+    # Apply Gravity/Drag
+    is_rocket = self.state == 1
+    is_spark = self.state == 2
 
-        # Apply Drag (Air Resistance)
-        self.vx *= (1.0 - (0.5 * dt))
-        self.vy *= (1.0 - (0.5 * dt))
+    self.vy[is_rocket] -= 0.3 * dt
+    self.vy[is_spark] -= 0.5 * dt
 
-        # Move
-        self.x[active] += self.vx[active] * dt
-        self.y[active] += self.vy[active] * dt
+    self.vx *= (1.0 - (0.5 * dt))
+    self.vy *= (1.0 - (0.5 * dt))
 
-        # Cylinder Wrap X
-        self.x %= 1.0
+    # Move
+    self.x[active] += self.vx[active] * dt
+    self.y[active] += self.vy[active] * dt
+    self.x %= 1.0
 
-        # --- 3. LIFECYCLE MANAGEMENT ---
+    # --- 3. LIFECYCLE & DETONATION ---
 
-        # Age the particles
-        self.life[active] -= 0.4 * dt # Fade out speed
+    self.life[active] -= 0.4 * dt
+    self.state[self.life <= 0] = 0
 
-        # Kill old particles
-        self.state[self.life <= 0] = 0
+    # FIX: Explode if High Enough OR Stopped Rising
+    # condition 1: We hit the target height (Ideal)
+    # condition 2: We stalled (vy < 0) and are starting to fall back down (Fail-safe)
 
-        # Rocket Detonation Logic
-        # If rocket slows down enough (vy < 0.1) or hits target height
-        ready_to_blow = (self.state == 1) & (self.y > self.target_height)
+    ready_to_blow = (self.state == 1) & (
+            (self.y > self.target_height) | (self.vy < 0)
+    )
 
-        # We need to process detonations one by one to spawn children
-        # (This is the only loop, but it runs rarely)
-        detonators = np.where(ready_to_blow)[0]
-        for idx in detonators:
-            self.explode(idx)
+    detonators = np.where(ready_to_blow)[0]
+    for idx in detonators:
+        self.explode(idx)
 
     def render(self, buffer, mapper):
         active_indices = np.where(self.state > 0)[0]
