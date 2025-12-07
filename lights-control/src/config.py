@@ -7,7 +7,7 @@ LED_PIN = 18             # GPIO 18 (PWM)
 LED_FREQ_HZ = 800000     # 800khz
 LED_DMA = 10             # DMA Channel
 LED_BRIGHTNESS = 255     # 0-255 (We limit current in WLED, but here we do it via max brightness)
-LED_INVERT = False
+LED_INVERT = True
 LED_CHANNEL = 0
 
 # Geometry Settings
