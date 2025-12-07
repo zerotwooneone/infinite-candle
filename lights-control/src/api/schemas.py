@@ -56,9 +56,16 @@ class GameOfLifeLayer(BaseLayer):
     # NEW: Allow turning off transparency if they WANT the black box
     transparent: bool = True                # Generations per second
 
+class LavaLampLayer(BaseLayer):
+    type: Literal["lava"]
+    color: List[int] = [255, 0, 0]      # The Blob Color (e.g., Red)
+    bg_color: List[int] = [20, 0, 0]    # The Fluid Color (e.g., Dark Red)
+    blob_count: int = 6                 # How many wax blobs?
+    speed: float = 0.5                  # How fast they heat/cool
+
 # Update Union
 EffectConfig = Annotated[
-    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer, FireworkLayer, GameOfLifeLayer], # <--- Add
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer, FireworkLayer, GameOfLifeLayer, LavaLampLayer], # <--- Add
     Field(discriminator="type")
 ]
 

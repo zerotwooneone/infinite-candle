@@ -4,6 +4,7 @@ from src.effects.snow import SnowEffect
 from src.effects.fire import FireEffect
 from src.effects.fireworks import FireworkEffect
 from src.effects.gol import GameOfLifeEffect
+from src.effects.lava import LavaLampEffect
 def create_effect(config):
     t = config.type
     if t == "stripes": return StripesEffect(config)
@@ -12,5 +13,6 @@ def create_effect(config):
     elif t == "fire": return FireEffect(config)
     elif t == "fireworks": return FireworkEffect(config)
     elif t == "gol": return GameOfLifeEffect(config)
+    elif t == "lava": return LavaLampEffect(config)
 
     return None
