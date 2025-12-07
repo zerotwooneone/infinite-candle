@@ -15,6 +15,6 @@ def create_effect(config):
     elif t == "fireworks": return FireworkEffect(config)
     elif t == "gol": return GameOfLifeEffect(config)
     elif t == "lava": return LavaLampEffect(config)
-    elif t == "breathing": return BreathingEffect(config)(config)
+    elif t == "breathing": return BreathingEffect(config)
 
     return None
