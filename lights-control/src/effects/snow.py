@@ -1,5 +1,12 @@
 import numpy as np
 from src.effects.abstract import Effect
+from src.config import LED_COUNT
+
+# --- CONFIGURATION ---
+# Toggle this to False if you want hard, crisp pixels only
+ENABLE_BLOOM = True
+BLOOM_RADIUS = 0.02   # How wide is the soft glow? (0.0 to 1.0)
+BLOOM_BRIGHTNESS = 0.3 # Brightness of the ring relative to core (0.0 to 1.0)
 
 class SnowEffect(Effect):
     def __init__(self, config):
@@ -7,73 +14,108 @@ class SnowEffect(Effect):
         self.count = config.flake_count
         self.color = np.array(config.color, dtype=np.uint8)
 
-        # --- PHYSICAL STATE ---
-        # Instead of "Index" (0-600), we track 2D coordinates.
+        # --- PHYSICS CONSTANTS ---
+        # We default wind to 0.1 (slight rotation) if not in config
+        self.gravity = getattr(config, 'gravity', 0.5)
+        self.wind_speed = getattr(config, 'wind', 0.05)
+        self.turbulence_magnitude = 0.2 # How chaotic is the air?
+
+        # --- PARTICLE STATE ---
         # Y: 1.0 (Top) to 0.0 (Bottom)
-        # X: 0.0 to 1.0 (Around the cylinder)
+        # X: 0.0 to 1.0 (Azimuth/Rotation around pillar)
         self.flakes_y = np.random.uniform(0.0, 1.0, self.count)
         self.flakes_x = np.random.uniform(0.0, 1.0, self.count)
 
-        # Random fall speeds for each flake
-        # gravity 1.0 approx 20% of height per second
-        self.speeds = np.random.uniform(0.1, 0.3, self.count) * config.gravity
+        # Individual particle variations (Mass/Drag)
+        # Some fall faster, some get pushed by wind more
+        self.mass_variance = np.random.uniform(0.8, 1.2, self.count)
 
     def update(self, dt: float):
-        # 1. Fall Down (Decrease Y)
-        self.flakes_y -= self.speeds * dt
+        # 1. Calculate Forces
 
-        # 2. Reset flakes that pass the bottom
-        # We use a mask to find flakes < 0.0 and wrap them to top (1.0 + random offset)
+        # Gravity Vector (Down)
+        dy = -self.gravity * self.mass_variance * dt
+
+        # Wind Vector (Lateral) + Brownian Motion (Random Jitter)
+        # We generate a random drift for every flake, every frame
+        brownian_drift = np.random.normal(0, self.turbulence_magnitude, self.count)
+        dx = (self.wind_speed + brownian_drift) * dt
+
+        # 2. Apply Movement
+        self.flakes_y += dy
+        self.flakes_x += dx
+
+        # 3. Boundary Checks
+
+        # Floor Check: If it hits bottom (y < 0), wrap to top
+        # We add a random Y offset so they don't all reappear at exactly 1.0 at once
         reset_mask = self.flakes_y < 0
-        self.flakes_y[reset_mask] = 1.0 + np.random.uniform(0, 0.2, np.sum(reset_mask))
-        self.flakes_x[reset_mask] = np.random.uniform(0.0, 1.0, np.sum(reset_mask))
+        reset_count = np.sum(reset_mask)
+        if reset_count > 0:
+            self.flakes_y[reset_mask] = 1.0 + np.random.uniform(0, 0.1, reset_count)
+            # Re-randomize X so it doesn't look like the same flake looping
+            self.flakes_x[reset_mask] = np.random.uniform(0.0, 1.0, reset_count)
 
-        # 3. Lateral Drift (Wind)
-        # Small sine wave motion + random jitter
-        self.flakes_x += np.random.normal(0, 0.05, self.count) * dt
-        self.flakes_x %= 1.0 # Wrap around cylinder
+        # Cylinder Wrap: If x goes < 0.0 or > 1.0, wrap around
+        self.flakes_x %= 1.0
 
     def render(self, buffer: np.ndarray, mapper):
-        """
-        Matrix Math Magic:
-        We calculate the distance from every Snowflake to every LED in one go.
-        """
-        # LED Coordinates (Shape: 1 x 600)
-        led_y = mapper.coords_y[np.newaxis, :]
-        led_x = mapper.coords_x[np.newaxis, :]
+        # --- COORDINATE MAPPING ---
+        # Map 1D LEDs to 2D Space
+        led_y = mapper.coords_y[np.newaxis, :] # (1, 600)
+        led_x = mapper.coords_x[np.newaxis, :] # (1, 600)
 
-        # Flake Coordinates (Shape: 50 x 1)
-        flake_y = self.flakes_y[:, np.newaxis]
-        flake_x = self.flakes_x[:, np.newaxis]
+        flake_y = self.flakes_y[:, np.newaxis] # (50, 1)
+        flake_x = self.flakes_x[:, np.newaxis] # (50, 1)
 
-        # --- Distance Calculation ---
+        # --- DISTANCE CALCULATION ---
+        # 1. Vertical Distance (Scaled by aspect ratio for circularity)
+        dy = np.abs(led_y - flake_y) * mapper.aspect_ratio
 
-        # 1. Vertical Distance
-        dy = np.abs(led_y - flake_y)
-        # Scale Y by aspect ratio so '0.05' distance is a circle, not an oval
-        dy *= mapper.aspect_ratio
+        # 2. Horizontal Distance (Handling the 0.0 <-> 1.0 wrap)
+        raw_dx = np.abs(led_x - flake_x)
+        dx = np.minimum(raw_dx, 1.0 - raw_dx)
 
-        # 2. Horizontal Distance (Handle Cylinder Wrap)
-        # Distance between 0.99 and 0.01 should be 0.02, not 0.98
-        dx_raw = np.abs(led_x - flake_x)
-        dx = np.minimum(dx_raw, 1.0 - dx_raw)
-
-        # 3. Euclidean Distance Squared
+        # 3. Exact Distance Squared
         dist_sq = (dx**2) + (dy**2)
 
-        # --- Rendering ---
+        # --- RENDER: CORE (The 1-pixel flake) ---
+        # Find the index of the single closest LED for each flake
+        nearest_indices = np.argmin(dist_sq, axis=1)
 
-        # Snow Size Radius (squared)
-        # 0.002 is roughly a "tight" dot. Increase for fuzzier snow.
-        radius_sq = 0.002
+        # We use a histogram method or simple assignment to handle collisions
+        # (Two flakes hitting same pixel)
+        buffer[nearest_indices] = self.color
 
-        # Find all pairs where distance is close enough
-        # Shape: (50, 600) Boolean Matrix
-        visible_mask = dist_sq < radius_sq
+        # --- RENDER: BLOOM (Optional) ---
+        if ENABLE_BLOOM:
+            # Find LEDs that are within the bloom radius (but NOT the core pixel)
+            # We create a dimmer color
+            dim_color = (self.color * BLOOM_BRIGHTNESS).astype(np.uint8)
 
-        # Collapse the matrix: If an LED is hit by ANY snowflake, light it up
-        # Shape: (600,) Boolean Array
-        leds_to_light = np.any(visible_mask, axis=0)
+            # Mask: "Close enough to glow" AND "Not the core center"
+            # Note: radius is squared here to match dist_sq
+            bloom_mask = (dist_sq < (BLOOM_RADIUS**2))
 
-        # Apply color
-        buffer[leds_to_light] = self.color
+            # We must verify we don't overwrite the bright cores.
+            # However, since 'render' runs sequentially, the simplest way is:
+            # 1. Draw Bloom everywhere applicable
+            # 2. Draw Cores on top (which we did above, so we reverse order)
+
+            # Let's do it cleanly:
+            # Collapse bloom mask: If an LED is in range of ANY flake
+            leds_to_bloom = np.any(bloom_mask, axis=0)
+
+            # Draw bloom (using simple addition to blend if multiple flakes overlap?)
+            # For simplicity, we just set them to dim_color first
+            # Use 'np.maximum' to blend so we don't dim existing bright spots if layers mix
+            # But since we have direct access, let's just write:
+
+            # 1. Clear buffer (Engine does this, but we want to mix bloom)
+            # Actually, the Engine clears the buffer before calling us.
+
+            # Optimization: Write Bloom First
+            buffer[leds_to_bloom] = dim_color
+
+            # Optimization: Write Core Second (Overwrite bloom)
+            buffer[nearest_indices] = self.color
