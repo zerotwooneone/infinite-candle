@@ -63,9 +63,16 @@ class LavaLampLayer(BaseLayer):
     blob_count: int = 6                 # How many wax blobs?
     speed: float = 0.5                  # How fast they heat/cool
 
+class BreathingLayer(BaseLayer):
+    type: Literal["breathing"]
+    color_a: List[int] = [50, 50, 50]   # Low state
+    color_b: List[int] = [255, 255, 255] # High state
+    speed: float = 0.5                  # Cycles per second (Breaths per second)
+
 # Update Union
 EffectConfig = Annotated[
-    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer, FireworkLayer, GameOfLifeLayer, LavaLampLayer], # <--- Add
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer,
+    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer], # <--- Add
     Field(discriminator="type")
 ]
 
