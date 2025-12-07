@@ -9,7 +9,7 @@ class FireEffect(ParticleSystem):
         # Physics Params
         self.cooling = config.cooling
 
-        # FIX 1: Positive means UP (Increasing Height 0.0 -> 1.0)
+        # Physics: Positive means UP
         self.rise_speed = 0.5
 
         # Color Gradients
@@ -19,11 +19,9 @@ class FireEffect(ParticleSystem):
         self.bloom_radius = 0.035
         self.particle_intensity = 1.0
 
-        # Initialize particles at the base of the fire
+        # Initialize particles
         self.y = np.random.uniform(config.h_min, config.h_min + 0.05, self.count)
         self.life = np.random.uniform(0.0, 1.0, self.count)
-
-        # FIX 2: Initialize velocity Upwards
         self.vy = np.random.uniform(0.1, 0.4, self.count)
 
     def update(self, dt: float):
@@ -34,20 +32,36 @@ class FireEffect(ParticleSystem):
         self.life -= self.cooling * dt
 
         # 3. Respawn Logic
+        # Die if Life < 0 OR Height > h_max
         dead_mask = (self.life <= 0) | (self.y > self.config.h_max)
 
         if np.any(dead_mask):
             count = np.sum(dead_mask)
-            # Respawn at h_min (The interface between Wax and Fire)
+            # Respawn at h_min
             self.y[dead_mask] = self.config.h_min
             self.x[dead_mask] = np.random.uniform(0.0, 1.0, count)
             # Reset Life
             self.life[dead_mask] = np.random.uniform(0.8, 1.2, count)
-
-            # FIX 3: Burst UPWARDS (Positive Velocity)
+            # Reset Velocity
             self.vy[dead_mask] = np.random.uniform(0.1, 0.5, count)
 
     def render(self, buffer, mapper):
+        # --- DYNAMIC COLOR & BRIGHTNESS CALCULATION ---
+
+        # 1. Clip Life to 0.0-1.0
         l = np.clip(self.life, 0.0, 1.0)[:, np.newaxis]
-        particle_colors = (self.c_start * l) + (self.c_end * (1.0 - l))
-        self.render_particles(buffer, mapper, particle_colors)
+
+        # 2. Calculate Base Color (Interpolate Start -> End)
+        # Note: You might want to flip this if you want Yellow(Start) -> Red(End)
+        # Currently: Start(Red) -> End(Yellow)
+        base_color = (self.c_start * l) + (self.c_end * (1.0 - l))
+
+        # 3. Calculate Fade (Brightness)
+        # We square the life (l^2) to make the fade happen faster at the end
+        # This prevents "Ghost particles" that are barely visible for too long
+        fade = l ** 2
+
+        # 4. Apply Fade to Color
+        final_color = base_color * fade
+
+        self.render_particles(buffer, mapper, final_color)
