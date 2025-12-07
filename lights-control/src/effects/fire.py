@@ -17,7 +17,7 @@ class FireEffect(ParticleSystem):
         self.c_end = np.array(config.color_end, dtype=float)
 
         self.bloom_radius = 0.035
-        self.particle_intensity = 1.0
+        self.particle_intensity = 0.15
 
         # Initialize particles
         self.y = np.random.uniform(config.h_min, config.h_min + 0.05, self.count)
