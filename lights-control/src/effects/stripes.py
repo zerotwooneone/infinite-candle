@@ -82,4 +82,12 @@ class StripesEffect(Effect):
         # 4. Color Blend
         final_colors = (self.c_a * mix) + (self.c_b * (1.0 - mix))
 
-        buffer[:] = final_colors.astype(np.uint8)
+        alpha = self.config.opacity
+    
+        if alpha >= 1.0:
+            buffer[:] = final_colors.astype(np.uint8)
+        else:
+            # Vectorized Blend for the whole strip
+            current_buffer = buffer.astype(float)
+            blended = (current_buffer * (1.0 - alpha)) + (final_colors * alpha)
+            buffer[:] = blended.astype(np.uint8)

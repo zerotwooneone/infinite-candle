@@ -50,9 +50,11 @@ class FireworkLayer(BaseLayer):
 
 class GameOfLifeLayer(BaseLayer):
     type: Literal["gol"]
-    color: List[int] = [0, 255, 0]      # Alive Color (Green)
-    bg_color: List[int] = [0, 0, 0]     # Dead Color (Black)
-    speed: float = 10.0                 # Generations per second
+    color: List[int] = [0, 255, 0]
+    bg_color: List[int] = [0, 0, 0]
+    speed: float = 10.0
+    # NEW: Allow turning off transparency if they WANT the black box
+    transparent: bool = True                # Generations per second
 
 # Update Union
 EffectConfig = Annotated[
