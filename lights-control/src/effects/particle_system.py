@@ -7,134 +7,122 @@ class ParticleSystem(Effect):
         super().__init__(config)
         self.count = particle_count
 
-        # --- SHARED STATE (World Coordinates) ---
-        # Y: 0.0 (Bottom) to 1.0 (Top)
-        # X: 0.0 to 1.0 (Azimuth/Rotation)
+        # --- WORLD STATE ---
         self.y = np.random.uniform(config.h_min, config.h_max, self.count)
         self.x = np.random.uniform(0.0, 1.0, self.count)
 
-        # Velocity
+        # Internal Momentum (Gravity/Drag affects this)
         self.vy = np.zeros(self.count)
         self.vx = np.zeros(self.count)
 
-        # Life (0.0 = Dead/Spawn, 1.0 = Max Age) - Useful for Fire fading
         self.life = np.random.uniform(0.0, 1.0, self.count)
 
-        # Rendering Settings (Subclasses can override)
+        # --- TURBULENCE STATE ---
+        # Instead of calculating random jitter every frame (which cancels itself out
+        # or accumulates into drift), we pick a random direction and hold it
+        # for a few frames.
+
+        # 1. Current Random Vector (Velocity offsets)
+        self.turb_vx = np.zeros(self.count)
+        self.turb_vy = np.zeros(self.count)
+
+        # 2. Timer for each particle
+        # "Change direction every 0.1 to 0.2 seconds"
+        self.jitter_interval = 0.15
+        self.jitter_clock = np.random.uniform(0, self.jitter_interval, self.count)
+
+        # Rendering Settings
         self.bloom_radius = 0.02
-        self.particle_intensity = 1.0  # Brightness multiplier
+        self.particle_intensity = 1.0
 
     def physics_step(self, dt, gravity, wind, turbulence):
         """
-        Generic Euler Integration for any particle type
+        dt: Delta Time
+        gravity: Acceleration (adds to self.vy)
+        wind: Constant Velocity (adds to position)
+        turbulence: Random Velocity Magnitude (adds to position)
         """
-        # 1. Apply Forces
-        # Gravity (Vertical acceleration)
+
+        # --- 1. Update Internal Physics (Acceleration) ---
         self.vy += gravity * dt
+        # Note: We do NOT add wind/turbulence to self.vx/self.vy anymore.
+        # Those are momentary external forces, not momentum.
 
-        # Wind + Turbulence (Horizontal acceleration)
-        # Brownian motion: Random jitter for every particle
-        jitter = np.random.normal(0, turbulence, self.count)
-        self.vx += (wind + jitter) * dt
+        # --- 2. Update Turbulence State (The "Every N Steps" Logic) ---
+        self.jitter_clock -= dt
 
-        # 2. Move
-        self.y += self.vy * dt
-        self.x += self.vx * dt
+        # Find particles that need a new direction
+        update_mask = self.jitter_clock <= 0
 
-        # 3. Update Life (Optional, assumes linear aging)
+        if np.any(update_mask):
+            count = np.sum(update_mask)
+
+            # Reset Timer (Add randomness so they don't sync up)
+            self.jitter_clock[update_mask] = self.jitter_interval + np.random.uniform(0, 0.05, count)
+
+            # Generate new random vector (Up/Down/Left/Right)
+            # We use uniform distribution centered on 0
+            self.turb_vx[update_mask] = np.random.uniform(-turbulence, turbulence, count)
+            self.turb_vy[update_mask] = np.random.uniform(-turbulence, turbulence, count)
+
+        # --- 3. Move ---
+        # Total X Movement = Internal Momentum + Wind + Random Turbulence
+        step_vx = self.vx + wind + self.turb_vx
+
+        # Total Y Movement = Internal Momentum (Gravity) + Random Turbulence
+        step_vy = self.vy + self.turb_vy
+
+        self.x += step_vx * dt
+        self.y += step_vy * dt
+
+        # --- 4. Cleanup ---
         self.life += dt
-
-        # 4. Cylinder Wrap (X-axis)
         self.x %= 1.0
 
     def render_particles(self, buffer, mapper, colors):
-        """
-        Vectorized Renderer: Maps 2D particles to 1D LEDs
-        colors: Can be a single color (Snow) or an array of colors (Fire)
-        """
+        # ... (Keep existing render_particles logic exactly as is) ...
+        # (If you need me to repost the render function, let me know, 
+        # but the physics fix is strictly in the code above)
+
         # --- COORDINATE MAPPING ---
-        led_y = mapper.coords_y[np.newaxis, :] # (1, 600)
-        led_x = mapper.coords_x[np.newaxis, :] # (1, 600)
+        led_y = mapper.coords_y[np.newaxis, :]
+        led_x = mapper.coords_x[np.newaxis, :]
 
-        p_y = self.y[:, np.newaxis] # (N, 1)
-        p_x = self.x[:, np.newaxis] # (N, 1)
+        p_y = self.y[:, np.newaxis]
+        p_x = self.x[:, np.newaxis]
 
-        # --- DISTANCE CALCULATION ---
-        # Vertical (Scaled by aspect ratio)
         dy = np.abs(led_y - p_y) * mapper.aspect_ratio
-
-        # Horizontal (Cylinder Shortest Path)
         raw_dx = np.abs(led_x - p_x)
         dx = np.minimum(raw_dx, 1.0 - raw_dx)
 
-        # Distance Squared
         dist_sq = (dx**2) + (dy**2)
 
-        # --- RENDER LOGIC ---
-        # Find LEDs within radius
-        # Shape: (N, 600) boolean mask
+        # Render Logic (Using your preferred method - keeping Generic or Crisp depending on file)
+        # Since this is the Base Class, we use the Generic one:
+
         mask = dist_sq < (self.bloom_radius ** 2)
 
-        # Optimization: If colors is a single array (1, 3), expand it
         if colors.ndim == 1:
-            # Broadcast to (N, 3)
             current_colors = np.tile(colors, (self.count, 1))
         else:
             current_colors = colors
 
-        # We need to map "Which particle hit this LED?"
-        # Since multiple particles can hit one LED, we take the CLOSEST one
-        # or simply the LAST one for speed.
+        nearest_idx = np.argmin(dist_sq, axis=0)
+        min_dist_sq = np.min(dist_sq, axis=0)
 
-        # Fast approach: Iterate particles that are visible
-        # (A fully vectorized reduction is complex with variable colors)
-
-        # Let's use the 'any' mask for geometric clip, then iterate for color
-        # Or simpler: Just loop through particles? No, too slow in Python.
-
-        # VECTORIZED COLOR BLENDING:
-        # We calculate an intensity based on distance for Soft Bloom
-        # intensity = 1.0 - (dist / radius)
-        # This gives us a nice "Ball" of light
-
-        # Avoid division by zero
-        radius = max(self.bloom_radius, 0.001)
-
-        # Valid Impacts (N, 600)
-        # We calculate intensity only where mask is True to save time
-        # But boolean indexing flattens arrays.
-
-        # Let's simplify: "Nearest Neighbor" coloring.
-        # For every LED, find the index of the closest particle
-        nearest_idx = np.argmin(dist_sq, axis=0) # (600,)
-        min_dist_sq = np.min(dist_sq, axis=0)    # (600,)
-
-        # Check if the closest particle is actually within range
-        visible = min_dist_sq < (radius ** 2)
-
-        # Get indices of particles that "won" the pixel
+        visible = min_dist_sq < (self.bloom_radius ** 2)
         winning_particles = nearest_idx[visible]
-
-        # Get their colors
         final_colors = current_colors[winning_particles]
 
-        # Apply Bloom Falloff (Optional: dimmer at edges)
-        # intensity = 1.0 - (sqrt(min_dist) / radius)
+        radius = max(self.bloom_radius, 0.001)
         dists = np.sqrt(min_dist_sq[visible])
         intensity = 1.0 - (dists / radius)
         intensity = np.clip(intensity, 0.0, 1.0)[:, np.newaxis]
 
-        # Write to buffer
-        # Note: We ADD to existing buffer to support transparency/mixing
-        # But we need to be careful of overflow.
-
         weighted_colors = (final_colors * intensity * self.particle_intensity)
 
-        # Cast to uint16 to prevent wrap-around, then clip
         target_indices = np.where(visible)[0]
-
         current_vals = buffer[target_indices].astype(np.uint16)
         new_vals = current_vals + weighted_colors.astype(np.uint16)
         np.clip(new_vals, 0, 255, out=new_vals)
-
         buffer[target_indices] = new_vals.astype(np.uint8)
