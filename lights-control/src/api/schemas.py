@@ -48,9 +48,15 @@ class FireworkLayer(BaseLayer):
     burst_height: float = 0.8
     explosion_size: float = 0.15
 
-# --- The Union ---
+class GameOfLifeLayer(BaseLayer):
+    type: Literal["gol"]
+    color: List[int] = [0, 255, 0]      # Alive Color (Green)
+    bg_color: List[int] = [0, 0, 0]     # Dead Color (Black)
+    speed: float = 10.0                 # Generations per second
+
+# Update Union
 EffectConfig = Annotated[
-    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer, FireworkLayer], # <--- Add FireworkLayer
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer, FireworkLayer, GameOfLifeLayer], # <--- Add
     Field(discriminator="type")
 ]
 

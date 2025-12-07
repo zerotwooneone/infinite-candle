@@ -2,14 +2,15 @@ from src.effects.stripes import StripesEffect
 from src.effects.solid import SolidEffect
 from src.effects.snow import SnowEffect
 from src.effects.fire import FireEffect
-from src.effects.fireworks import FireworkEffect # <--- Import
-
+from src.effects.fireworks import FireworkEffect
+from src.effects.gol import GameOfLifeEffect
 def create_effect(config):
     t = config.type
     if t == "stripes": return StripesEffect(config)
     elif t == "solid": return SolidEffect(config)
     elif t == "snow": return SnowEffect(config)
     elif t == "fire": return FireEffect(config)
-    elif t == "fireworks": return FireworkEffect(config) # <--- Add
+    elif t == "fireworks": return FireworkEffect(config)
+    elif t == "gol": return GameOfLifeEffect(config)
 
     return None
