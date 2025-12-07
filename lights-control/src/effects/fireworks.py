@@ -1,9 +1,11 @@
+# src/effects/fireworks.py
 import numpy as np
 import random
 from src.effects.particle_system import ParticleSystem
 
 class FireworkEffect(ParticleSystem):
     def __init__(self, config):
+        # Initialize parent with 400 particles
         super().__init__(config, particle_count=400)
 
         # --- CONFIGURATION ---
@@ -11,193 +13,149 @@ class FireworkEffect(ParticleSystem):
         self.launch_timer = 0.0
         self.target_height = config.burst_height
 
-        # POSITIONS
-        self.y = np.zeros(self.max_particles)
-        self.x = np.zeros(self.max_particles)
-
-        # VELOCITIES
-        self.vy = np.zeros(self.max_particles)
-        self.vx = np.zeros(self.max_particles)
-
-        # ATTRIBUTES
-        self.life = np.zeros(self.max_particles)     # 1.0 -> 0.0
-        self.state = np.zeros(self.max_particles, dtype=int) # 0=Dead, 1=Rocket, 2=Spark
-
-        # COLORS (R, G, B)
-        self.colors = np.zeros((self.max_particles, 3), dtype=np.uint8)
-
-        # TYPE FLAGS (For special rendering like Crackle)
-        # 0=Normal, 1=Crackle, 2=Streamer, 3=Shockwave
+        # --- STATE MANAGEMENT ---
+        # 0=Dead, 1=Rocket, 2=Spark
+        self.state = np.zeros(self.max_particles, dtype=int)
         self.spark_type = np.zeros(self.max_particles, dtype=int)
+
+        # Colors (N, 3)
+        self.colors = np.zeros((self.max_particles, 3), dtype=np.uint8)
 
     def spawn_rocket(self):
         # Find 1 dead slot
         dead_slots = np.where(self.state == 0)[0]
-        if len(dead_slots) < 1: return # Pool full
+        if len(dead_slots) < 1: return
 
         idx = dead_slots[0]
 
         # Initialize Rocket
         self.state[idx] = 1 # Rocket
         self.y[idx] = 0.0   # Start at bottom
-        self.x[idx] = np.random.uniform(0.0, 1.0) # Random side
-        self.vy[idx] = 0.6  # Fast launch speed
+        self.x[idx] = np.random.uniform(0.0, 1.0)
+        self.vy[idx] = 0.9  # Fast launch speed
         self.vx[idx] = 0.0
         self.life[idx] = 1.0
 
-        # Color: Dim White/Smoke
+        # Color: Dim White
         self.colors[idx] = [100, 100, 100]
         self.spark_type[idx] = 0
 
     def explode(self, parent_idx):
-        # The rocket has reached its peak. Time to spawn sparks!
-
-        # 1. Kill the rocket
+        # Kill rocket
         self.state[parent_idx] = 0
         origin_x = self.x[parent_idx]
         origin_y = self.y[parent_idx]
 
-        # 2. Choose Explosion Type
-        # 0=Starburst, 1=Crackle, 2=Streamer, 3=Shockwave
+        # Choose Explosion
         exp_type = random.choices([0, 1, 2, 3], weights=[0.4, 0.2, 0.2, 0.2])[0]
-
-        # 3. Choose Color
-        # Random vivid color
         base_color = np.random.randint(50, 255, 3)
-        # Randomize secondary color slightly for variety
 
-        # 4. Spawn Sparks
-        # How many?
+        # Spawn Sparks
         count = 40 if exp_type != 3 else 60
-
         dead_slots = np.where(self.state == 0)[0]
-        if len(dead_slots) < count:
-            count = len(dead_slots)
-
+        if len(dead_slots) < count: count = len(dead_slots)
         if count == 0: return
 
         indices = dead_slots[:count]
 
         # Set State
-        self.state[indices] = 2 # Spark
+        self.state[indices] = 2
         self.life[indices] = 1.0
         self.spark_type[indices] = exp_type
-
-        # Set Position (Start at rocket location)
         self.x[indices] = origin_x
         self.y[indices] = origin_y
 
-        # --- EXPLOSION PHYSICS ---
-
-        if exp_type == 3: # Shockwave (Ring)
-            # Expand purely horizontally (around the pillar)
-            # and slightly vertically
+        # Explosion Physics
+        if exp_type == 3: # Shockwave
             angle = np.linspace(0, 2*np.pi, count)
             speed = 0.3
-            # We map 2D circle to Cylinder surface
             self.vx[indices] = np.cos(angle) * speed
-            self.vy[indices] = np.sin(angle) * (speed * 0.2) # Flattened ring
-            self.colors[indices] = [255, 255, 255] # White shockwave
-
-        else: # Starburst / Crackle / Streamer
-            # Random spherical burst
+            self.vy[indices] = np.sin(angle) * (speed * 0.2)
+            self.colors[indices] = [255, 255, 255]
+        else:
             self.vx[indices] = np.random.uniform(-0.3, 0.3, count)
             self.vy[indices] = np.random.uniform(-0.3, 0.3, count)
             self.colors[indices] = base_color
+            if exp_type == 2: self.vy[indices] -= 0.1 # Streamer drag
 
-            if exp_type == 2: # Streamer
-                # Streamers fall faster (heavy)
-                self.vy[indices] -= 0.1
+    def update(self, dt: float):
+        # --- 1. SPAWN ---
+        self.launch_timer += dt
+        if self.launch_timer > (1.0 / self.launch_rate):
+            self.spawn_rocket()
+            self.launch_timer = 0.0
+            self.launch_timer -= np.random.uniform(0.0, 0.5)
 
-def update(self, dt: float):
-    # ... (Spawn Logic is fine) ...
+        # --- 2. PHYSICS ---
+        active = self.state > 0
+        is_rocket = self.state == 1
+        is_spark = self.state == 2
 
-    # --- 2. PHYSICS UPDATE ---
-    active = self.state > 0
+        # Gravity
+        self.vy[is_rocket] -= 0.3 * dt
+        self.vy[is_spark] -= 0.5 * dt
 
-    # ... (Gravity/Drag logic is fine) ...
+        # Drag
+        self.vx *= (1.0 - (0.5 * dt))
+        self.vy *= (1.0 - (0.5 * dt))
 
-    # Apply Gravity/Drag
-    is_rocket = self.state == 1
-    is_spark = self.state == 2
+        # Move
+        self.x[active] += self.vx[active] * dt
+        self.y[active] += self.vy[active] * dt
+        self.x %= 1.0
 
-    self.vy[is_rocket] -= 0.3 * dt
-    self.vy[is_spark] -= 0.5 * dt
+        # --- 3. LIFECYCLE ---
+        self.life[active] -= 0.4 * dt
+        self.state[self.life <= 0] = 0
 
-    self.vx *= (1.0 - (0.5 * dt))
-    self.vy *= (1.0 - (0.5 * dt))
+        # Detonation Check (Height OR Stall)
+        ready_to_blow = (self.state == 1) & (
+                (self.y > self.target_height) | (self.vy < 0)
+        )
 
-    # Move
-    self.x[active] += self.vx[active] * dt
-    self.y[active] += self.vy[active] * dt
-    self.x %= 1.0
+        detonators = np.where(ready_to_blow)[0]
+        for idx in detonators:
+            self.explode(idx)
 
-    # --- 3. LIFECYCLE & DETONATION ---
+    def render(self, buffer, mapper):
+        active_indices = np.where(self.state > 0)[0]
+        if len(active_indices) == 0: return
 
-    self.life[active] -= 0.4 * dt
-    self.state[self.life <= 0] = 0
+        # Coordinate Mapping
+        led_y = mapper.coords_y[np.newaxis, :]
+        led_x = mapper.coords_x[np.newaxis, :]
 
-    # FIX: Explode if High Enough OR Stopped Rising
-    # condition 1: We hit the target height (Ideal)
-    # condition 2: We stalled (vy < 0) and are starting to fall back down (Fail-safe)
+        p_y = self.y[active_indices, np.newaxis]
+        p_x = self.x[active_indices, np.newaxis]
 
-    ready_to_blow = (self.state == 1) & (
-            (self.y > self.target_height) | (self.vy < 0)
-    )
+        dy = np.abs(led_y - p_y) * mapper.aspect_ratio
+        raw_dx = np.abs(led_x - p_x)
+        dx = np.minimum(raw_dx, 1.0 - raw_dx)
+        dist_sq = (dx**2) + (dy**2)
 
-    detonators = np.where(ready_to_blow)[0]
-    for idx in detonators:
-        self.explode(idx)
+        # Find Closest
+        closest_leds = np.argmin(dist_sq, axis=1)
+        min_dists = dist_sq[np.arange(len(active_indices)), closest_leds]
 
-def render(self, buffer, mapper):
-    active_indices = np.where(self.state > 0)[0]
-    if len(active_indices) == 0: return
+        # Filter
+        valid_mask = min_dists < 0.0015
+        final_leds = closest_leds[valid_mask]
+        final_indices = active_indices[valid_mask]
 
-    # --- BATCH RENDER ---
-    # Map logical coordinates to visual LEDS
-    # (Using same Nearest Neighbor logic as Snow for crispness)
+        # Colors
+        colors = self.colors[final_indices].astype(float)
+        life_factors = self.life[final_indices, np.newaxis]
+        colors *= (life_factors ** 2)
 
-    led_y = mapper.coords_y[np.newaxis, :]
-    led_x = mapper.coords_x[np.newaxis, :]
+        # Crackle Effect
+        crackle_mask = self.spark_type[final_indices] == 1
+        if np.any(crackle_mask):
+            flicker = np.random.choice([0.0, 1.0], size=np.sum(crackle_mask))
+            colors[crackle_mask] *= flicker[:, np.newaxis]
 
-    # Filter down to active only
-    p_y = self.y[active_indices, np.newaxis]
-    p_x = self.x[active_indices, np.newaxis]
-
-    dy = np.abs(led_y - p_y) * mapper.aspect_ratio
-    raw_dx = np.abs(led_x - p_x)
-    dx = np.minimum(raw_dx, 1.0 - raw_dx)
-
-    dist_sq = (dx**2) + (dy**2)
-
-    # Find closest LEDs
-    closest_leds = np.argmin(dist_sq, axis=1)
-    min_dists = dist_sq[np.arange(len(active_indices)), closest_leds]
-
-    # Filter valid hits
-    valid_mask = min_dists < 0.0015
-    final_leds = closest_leds[valid_mask]
-    final_indices = active_indices[valid_mask]
-
-    # --- COLOR LOGIC ---
-    # 1. Get Base Colors
-    colors = self.colors[final_indices].astype(float)
-
-    # 2. Apply Fade (Life)
-    life_factors = self.life[final_indices, np.newaxis]
-    colors *= (life_factors ** 2) # Exponential fade
-
-    # 3. Apply Special Effects (Crackle)
-    # If type == 1 (Crackle), randomly multiply by 0 or 1
-    crackle_mask = self.spark_type[final_indices] == 1
-    if np.any(crackle_mask):
-        # 50% chance to be invisible this frame
-        flicker = np.random.choice([0.0, 1.0], size=np.sum(crackle_mask))
-        colors[crackle_mask] *= flicker[:, np.newaxis]
-
-    # 4. Write to Buffer (Additive)
-    target_indices = final_leds
-    current = buffer[target_indices].astype(float)
-    new_val = current + colors
-    np.clip(new_val, 0, 255, out=new_val)
-    buffer[target_indices] = new_val.astype(np.uint8)
+        # Write
+        target_indices = final_leds
+        current = buffer[target_indices].astype(float)
+        new_val = current + colors
+        np.clip(new_val, 0, 255, out=new_val)
+        buffer[target_indices] = new_val.astype(np.uint8)
