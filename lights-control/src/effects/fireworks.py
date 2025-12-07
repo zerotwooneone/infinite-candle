@@ -149,55 +149,55 @@ def update(self, dt: float):
     for idx in detonators:
         self.explode(idx)
 
-    def render(self, buffer, mapper):
-        active_indices = np.where(self.state > 0)[0]
-        if len(active_indices) == 0: return
+def render(self, buffer, mapper):
+    active_indices = np.where(self.state > 0)[0]
+    if len(active_indices) == 0: return
 
-        # --- BATCH RENDER ---
-        # Map logical coordinates to visual LEDS
-        # (Using same Nearest Neighbor logic as Snow for crispness)
+    # --- BATCH RENDER ---
+    # Map logical coordinates to visual LEDS
+    # (Using same Nearest Neighbor logic as Snow for crispness)
 
-        led_y = mapper.coords_y[np.newaxis, :]
-        led_x = mapper.coords_x[np.newaxis, :]
+    led_y = mapper.coords_y[np.newaxis, :]
+    led_x = mapper.coords_x[np.newaxis, :]
 
-        # Filter down to active only
-        p_y = self.y[active_indices, np.newaxis]
-        p_x = self.x[active_indices, np.newaxis]
+    # Filter down to active only
+    p_y = self.y[active_indices, np.newaxis]
+    p_x = self.x[active_indices, np.newaxis]
 
-        dy = np.abs(led_y - p_y) * mapper.aspect_ratio
-        raw_dx = np.abs(led_x - p_x)
-        dx = np.minimum(raw_dx, 1.0 - raw_dx)
+    dy = np.abs(led_y - p_y) * mapper.aspect_ratio
+    raw_dx = np.abs(led_x - p_x)
+    dx = np.minimum(raw_dx, 1.0 - raw_dx)
 
-        dist_sq = (dx**2) + (dy**2)
+    dist_sq = (dx**2) + (dy**2)
 
-        # Find closest LEDs
-        closest_leds = np.argmin(dist_sq, axis=1)
-        min_dists = dist_sq[np.arange(len(active_indices)), closest_leds]
+    # Find closest LEDs
+    closest_leds = np.argmin(dist_sq, axis=1)
+    min_dists = dist_sq[np.arange(len(active_indices)), closest_leds]
 
-        # Filter valid hits
-        valid_mask = min_dists < 0.0015
-        final_leds = closest_leds[valid_mask]
-        final_indices = active_indices[valid_mask]
+    # Filter valid hits
+    valid_mask = min_dists < 0.0015
+    final_leds = closest_leds[valid_mask]
+    final_indices = active_indices[valid_mask]
 
-        # --- COLOR LOGIC ---
-        # 1. Get Base Colors
-        colors = self.colors[final_indices].astype(float)
+    # --- COLOR LOGIC ---
+    # 1. Get Base Colors
+    colors = self.colors[final_indices].astype(float)
 
-        # 2. Apply Fade (Life)
-        life_factors = self.life[final_indices, np.newaxis]
-        colors *= (life_factors ** 2) # Exponential fade
+    # 2. Apply Fade (Life)
+    life_factors = self.life[final_indices, np.newaxis]
+    colors *= (life_factors ** 2) # Exponential fade
 
-        # 3. Apply Special Effects (Crackle)
-        # If type == 1 (Crackle), randomly multiply by 0 or 1
-        crackle_mask = self.spark_type[final_indices] == 1
-        if np.any(crackle_mask):
-            # 50% chance to be invisible this frame
-            flicker = np.random.choice([0.0, 1.0], size=np.sum(crackle_mask))
-            colors[crackle_mask] *= flicker[:, np.newaxis]
+    # 3. Apply Special Effects (Crackle)
+    # If type == 1 (Crackle), randomly multiply by 0 or 1
+    crackle_mask = self.spark_type[final_indices] == 1
+    if np.any(crackle_mask):
+        # 50% chance to be invisible this frame
+        flicker = np.random.choice([0.0, 1.0], size=np.sum(crackle_mask))
+        colors[crackle_mask] *= flicker[:, np.newaxis]
 
-        # 4. Write to Buffer (Additive)
-        target_indices = final_leds
-        current = buffer[target_indices].astype(float)
-        new_val = current + colors
-        np.clip(new_val, 0, 255, out=new_val)
-        buffer[target_indices] = new_val.astype(np.uint8)
+    # 4. Write to Buffer (Additive)
+    target_indices = final_leds
+    current = buffer[target_indices].astype(float)
+    new_val = current + colors
+    np.clip(new_val, 0, 255, out=new_val)
+    buffer[target_indices] = new_val.astype(np.uint8)
