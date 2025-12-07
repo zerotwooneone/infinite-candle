@@ -31,10 +31,16 @@ class SnowLayer(BaseLayer):
     flake_count: int = 40
     gravity: float = 0.5
 
-# --- The Union (The Critical Part) ---
-# Ensure ALL layer types (Solid, Chase, Stripes, Snow) are listed here!
+class FireLayer(BaseModel):
+    type: Literal["fire"]
+    opacity: float = 1.0
+    wax_height: float = 0.15     # How much of the bottom is solid wax?
+    cooling: float = 0.15        # How fast fire fades as it rises
+    sparking: float = 0.3        # How vigorously it flickers at the base
+
+# --- The Union ---
 EffectConfig = Annotated[
-    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer],
+    Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer], # <--- Add FireLayer
     Field(discriminator="type")
 ]
 

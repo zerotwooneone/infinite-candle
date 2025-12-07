@@ -1,13 +1,14 @@
+# src/effects/factory.py
 from src.effects.stripes import StripesEffect
-from src.effects.solid import SolidEffect    # <--- Add this
-from src.effects.snow import SnowEffect      # <--- Add this
+from src.effects.solid import SolidEffect
+from src.effects.snow import SnowEffect
+from src.effects.fire import FireEffect  # <--- Import
 
 def create_effect(config):
-    if config.type == "stripes":
-        return StripesEffect(config)
-    elif config.type == "solid":
-        return SolidEffect(config)
-    elif config.type == "snow":
-        return SnowEffect(config)
+    t = config.type
+    if t == "stripes": return StripesEffect(config)
+    elif t == "solid": return SolidEffect(config)
+    elif t == "snow": return SnowEffect(config)
+    elif t == "fire": return FireEffect(config) # <--- Add
 
     return None
