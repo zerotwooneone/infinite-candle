@@ -2,7 +2,7 @@ import numpy as np
 
 # --- CONFIGURATION (Must match your Pi Setup) ---
 LED_COUNT = 600
-PILLAR_WRAPS = 18.6
+PILLAR_WRAPS = 19.4
 HEIGHT_INCHES = 48.0
 CIRCUMFERENCE_INCHES = 21.0
 RADIUS_INCHES = CIRCUMFERENCE_INCHES / (2 * np.pi)
@@ -11,7 +11,7 @@ RADIUS_INCHES = CIRCUMFERENCE_INCHES / (2 * np.pi)
 FPS = 60
 DURATION_SEC = 10.0
 TOTAL_FRAMES = int(FPS * DURATION_SEC)
-OUTPUT_FILE = "snow_refined.npy"
+OUTPUT_FILE = "snow_heavy.npy"
 
 # --- REFINED PHYSICS ---
 FLAKE_COUNT = 800  # More flakes for better density
