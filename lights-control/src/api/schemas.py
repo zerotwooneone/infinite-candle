@@ -72,6 +72,7 @@ class BreathingLayer(BaseLayer):
 class ClipLayer(BaseLayer):
     type: Literal["clip"]
     filename: str
+    transparent: bool = False
 
 # Update Union
 EffectConfig = Annotated[
