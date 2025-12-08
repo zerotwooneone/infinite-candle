@@ -69,10 +69,14 @@ class BreathingLayer(BaseLayer):
     color_b: List[int] = [255, 255, 255] # High state
     speed: float = 0.5                  # Cycles per second (Breaths per second)
 
+class ClipLayer(BaseLayer):
+    type: Literal["clip"]
+    filename: str
+
 # Update Union
 EffectConfig = Annotated[
     Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer,
-    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer], # <--- Add
+    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,ClipLayer], # <--- Add
     Field(discriminator="type")
 ]
 

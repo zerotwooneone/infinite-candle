@@ -6,6 +6,7 @@ from src.effects.fireworks import FireworkEffect
 from src.effects.gol import GameOfLifeEffect
 from src.effects.lava import LavaLampEffect
 from src.effects.breathing import BreathingEffect
+from src.effects.player import ClipPlayerEffect
 def create_effect(config):
     t = config.type
     if t == "stripes": return StripesEffect(config)
@@ -16,5 +17,6 @@ def create_effect(config):
     elif t == "gol": return GameOfLifeEffect(config)
     elif t == "lava": return LavaLampEffect(config)
     elif t == "breathing": return BreathingEffect(config)
+    elif t == "clip": return ClipPlayerEffect(config)
 
     return None
