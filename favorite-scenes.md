@@ -5,11 +5,16 @@
   "layers": [
     {
       "type": "stripes",
-      "color_a": [255, 0, 0],
-      "color_b": [255, 255, 255],
+      "color_a": [55, 0, 0],
+      "color_b": [0, 55, 0],
       "angle": 45.0,
       "width": 0.5,
-      "speed": 5
+      "speed": 1
+    },
+    {
+      "type": "clip",
+      "filename": "snow_heavy.npy",
+      "transparent": true
     }
   ]
 }
@@ -43,20 +48,17 @@
 //snow
 ```json
 {
-    "layers": [
+  "layers": [
     {
-        "type": "solid",
-        "color": [0, 0, 1],
-        "opacity": 1.0
-        },
-        {
-        "type": "snow",
-        "color": [200, 200, 255],
-        "flake_count": 20,
-        "gravity": 0.05,
-        "wind": 0.1
+      "type": "solid",
+      "color": [1, 0, 2]
+    },
+    {
+      "type": "clip",
+      "filename": "snow_heavy.npy",
+      "transparent": true
     }
-    ]
+  ]
 }
 ```
 
@@ -98,17 +100,52 @@
 //fireworks
 ```json
 {
-    "layers": [
+  "layers": [
     {
-        "type": "solid",
-        "color": [1, 0, 1]
-        },
-        {
-        "type": "fireworks",
-        "launch_rate": 0.8,
-        "burst_height": 0.7,
-        "explosion_size": 0.2
+      "type": "solid",
+      "color": [1, 0, 2]
+    },
+    {
+      "type": "clip",
+      "filename": "fireworks_show.npy",
+      "transparent": true
     }
-    ]
+  ]
 }
 ```
+
+Geometric Wireframes
+```json
+{
+  "layers": [
+    {
+      "type": "solid",
+      "color": [10, 0, 20]
+    },
+    {
+      "type": "clip",
+      "filename": "wireframes_v1.npy",
+      "transparent": true
+    }
+  ]
+}
+```
+
+Plasma
+```json
+{
+  "layers": [
+    {
+      "type": "solid",
+      "color": [0, 0, 30]
+    },
+    {
+      "type": "clip",
+      "filename": "plasma_rainbow.npy",
+      "transparent": true,
+      "opacity": 1.0
+    }
+  ]
+}
+```
+
