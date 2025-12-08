@@ -92,3 +92,10 @@ To view the logs of the running service:
 ```bash
 journalctl -u infinite-candle.service -f
 ```
+
+## Development
+> sudo systemctl restart infinite-candle.service
+
+> sudo systemctl restart infinite-candle.service
+
+> sudo systemctl stop infinite-candle.service
