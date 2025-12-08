@@ -7,207 +7,205 @@ HEIGHT_INCHES = 48.0
 CIRCUMFERENCE_INCHES = 21.0
 RADIUS_INCHES = CIRCUMFERENCE_INCHES / (2 * np.pi)
 
-FPS = 30 # Lower FPS is fine for slow-moving shapes
-DURATION_SEC = 30.0
+FPS = 30
+DURATION_SEC = 24.0 # Must match loop cycle (multiples of 2*pi ideally)
 TOTAL_FRAMES = int(FPS * DURATION_SEC)
 OUTPUT_FILE = "wireframes_v1.npy"
 
-# How thick the wires look. Bigger = chunkier, better for low res.
-WIRE_THICKNESS_RADIUS_SQ = 0.004
+# Object Size Definition
+# A 3x3x3 grid of cubes.
+SUB_CUBE_SIZE = 7.0 # Each small cube is 7x7x7 inches
+GRID_SPACING = 7.5  # Slightly spaced out
 
-# --- GEOMETRY DEFINITIONS ---
-# Unit size shapes centered at 0,0,0
+# Colors
+COLOR_SURFACE = np.array([0, 100, 180]) # Deep Cyan/Blue
+COLOR_EDGE = np.array([255, 160, 0])    # Bright Orange/Gold
 
-# CUBE
-CUBE_VERTS = np.array([
-    [-1,-1,-1], [ 1,-1,-1], [ 1, 1,-1], [-1, 1,-1], # Bottom
-    [-1,-1, 1], [ 1,-1, 1], [ 1, 1, 1], [-1, 1, 1]  # Top
-])
-CUBE_EDGES = [
-    (0,1), (1,2), (2,3), (3,0), # Bottom ring
-    (4,5), (5,6), (6,7), (7,4), # Top ring
-    (0,4), (1,5), (2,6), (3,7)  # Pillars
-]
+# Rendering Tunables
+# How "thick" the solid surface feels. Needs to match sub_cube_size roughly.
+SURFACE_HIT_RADIUS_SQ = (SUB_CUBE_SIZE / 2.0 * 1.1) ** 2
+EDGE_THICKNESS_SQ = 0.005 # Thickness of wireframes on surface
 
-# OCTAHEDRON (Diamond shape)
-OCTA_VERTS = np.array([
-    [0,0,-1], # Bottom tip (0)
-    [1,0,0], [0,1,0], [-1,0,0], [0,-1,0], # Middle ring (1,2,3,4)
-    [0,0,1]   # Top tip (5)
-])
-OCTA_EDGES = [
-    (0,1), (0,2), (0,3), (0,4), # Bottom pyr
-    (5,1), (5,2), (5,3), (5,4), # Top pyr
-    (1,2), (2,3), (3,4), (4,1)  # Middle ring
-]
+# --- GEOMETRY GENERATION ---
 
-SHAPE_TYPES = [
-    (CUBE_VERTS, CUBE_EDGES, 5.0), # Verts, Edges, Scale size inches
-    (OCTA_VERTS, OCTA_EDGES, 7.0),
-    (CUBE_VERTS, CUBE_EDGES, 4.0),
-]
+def generate_compound_geometry():
+    centers = []
+    edges = set() # Use set to avoid duplicate edges between adjacent cubes
 
-# --- HELPER: 3D Rotation Matrices ---
-def rotate_x(a):
-    c = np.cos(a)
-    s = np.sin(a)
-    return np.array([[1,0,0],[0,c,-s],[0,s,c]])
+    # Generate 3x3x3 grid
+    offset = GRID_SPACING * 1.0 # Center the grid around 0,0,0
+    for x in [-1, 0, 1]:
+        for y in [-1, 0, 1]:
+            for z in [-1, 0, 1]:
+                # 1. Center point for surface volumetric rendering
+                cx, cy, cz = x * GRID_SPACING, y * GRID_SPACING, z * GRID_SPACING
+                centers.append([cx, cy, cz])
 
-def rotate_y(a):
-    c = np.cos(a)
-    s = np.sin(a)
-    return np.array([[c,0,s],[0,1,0],[-s,0,c]])
+                # 2. Generate edges for this sub-cube
+                # Define 8 corners relative to center
+                s = SUB_CUBE_SIZE / 2.0
+                corners = [
+                    (cx-s, cy-s, cz-s), (cx+s, cy-s, cz-s), (cx+s, cy+s, cz-s), (cx-s, cy+s, cz-s), # Bottom
+                    (cx-s, cy-s, cz+s), (cx+s, cy-s, cz+s), (cx+s, cy+s, cz+s), (cx-s, cy+s, cz+s)  # Top
+                ]
+                # Indices needed to make a cube
+                # (p1_idx, p2_idx)
+                local_edge_indices = [
+                    (0,1), (1,2), (2,3), (3,0), # Bottom ring
+                    (4,5), (5,6), (6,7), (7,4), # Top ring
+                    (0,4), (1,5), (2,6), (3,7)  # Pillars
+                ]
 
-def rotate_z(a):
-    c = np.cos(a)
-    s = np.sin(a)
-    return np.array([[c,-s,0],[s,c,0],[0,0,1]])
+                for p1_idx, p2_idx in local_edge_indices:
+                    # Create sorted tuple of actual 3D coordinates to ensure uniqueness
+                    # e.g. edge (A to B) is same as (B to A)
+                    p1_tuple = tuple(np.round(corners[p1_idx], 3))
+                    p2_tuple = tuple(np.round(corners[p2_idx], 3))
+                    edge = tuple(sorted((p1_tuple, p2_tuple)))
+                    edges.add(edge)
 
-class WireframeObject:
-    def __init__(self, shape_idx):
-        verts, edges, scale = SHAPE_TYPES[shape_idx]
-        self.local_verts = verts * scale
-        self.edges = edges
+    return np.array(centers), list(edges)
 
-        # Orbit parameters
-        self.orbit_radius = RADIUS_INCHES + np.random.uniform(4.0, 10.0)
-        self.orbit_speed = np.random.uniform(0.2, 0.6) * np.random.choice([-1, 1])
-        self.orbit_height = np.random.uniform(HEIGHT_INCHES*0.2, HEIGHT_INCHES*0.8)
-        self.orbit_phase = np.random.uniform(0, 2*np.pi)
+# --- ROTATION HELPERS ---
+def get_rotation_matrix(angle_x, angle_y, angle_z):
+    # Combine Rx, Ry, Rz
+    cx, sx = np.cos(angle_x), np.sin(angle_x)
+    cy, sy = np.cos(angle_y), np.sin(angle_y)
+    cz, sz = np.cos(angle_z), np.sin(angle_z)
 
-        # Self-tumbling parameters (rotation speeds around X, Y, Z axes)
-        self.tumble_speeds = np.random.uniform(0.5, 2.0, 3)
+    rx = np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]])
+    ry = np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])
+    rz = np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])
+    return rz @ ry @ rx
 
-        # Color (Neon palette)
-        colors = [
-            [0, 1, 1], # Cyan
-            [1, 0, 1], # Magenta
-            [1, 1, 0], # Yellow
-            [0, 1, 0.5], # Lime
-            [1, 0.5, 0]  # Orange
-        ]
-        self.color = np.array(colors[shape_idx % len(colors)])
-
-    def get_world_points(self, t):
-        # 1. Calculate Tumble Rotation Matrix
-        rx = rotate_x(t * self.tumble_speeds[0])
-        ry = rotate_y(t * self.tumble_speeds[1])
-        rz = rotate_z(t * self.tumble_speeds[2])
-        # Combine rotations (order matters, but random tumbling is fine)
-        rot_matrix = rz @ ry @ rx
-
-        # 2. Calculate Orbit Position (Center of shape)
-        angle = self.orbit_phase + (t * self.orbit_speed)
-        orbit_pos = np.array([
-            np.cos(angle) * self.orbit_radius,
-            np.sin(angle) * self.orbit_radius,
-            self.orbit_height + np.sin(t + self.orbit_phase)*5.0 # Add subtle vertical bob
-        ])
-
-        # 3. Transform vertices to World Space
-        # Rotate then Translate
-        world_verts = (self.local_verts @ rot_matrix.T) + orbit_pos
-
-        # 4. Densify Edges into Points
-        points = []
-        points_per_edge = 50 # High density for smooth lines
-
-        for v_start_idx, v_end_idx in self.edges:
-            p1 = world_verts[v_start_idx]
-            p2 = world_verts[v_end_idx]
-
-            # Linear interpolation between p1 and p2
-            for i in range(points_per_edge):
-                mix = i / (points_per_edge - 1)
-                p = p1 * (1-mix) + p2 * mix
-                points.append(p)
-
-        return np.array(points)
-
+# --- MAIN GENERATOR ---
 def generate_clip():
-    print(f"Generating Wireframes ({DURATION_SEC}s)...")
-
-    # Create a few distinct objects
-    objects = []
-    num_shapes = 5
-    for i in range(num_shapes):
-        # Cycle through shape types
-        objects.append(WireframeObject(i % len(SHAPE_TYPES)))
+    print(f"Generating Solid Compound Loop ({DURATION_SEC}s)...")
+    print("Building geometry...")
+    base_centers, base_edges_tuples = generate_compound_geometry()
+    print(f"Geometry: {len(base_centers)} sub-cubes, {len(base_edges_tuples)} unique edges.")
 
     clip_data = np.zeros((TOTAL_FRAMES, LED_COUNT, 3), dtype=np.uint8)
 
-    # Pre-calc mapping data
+    # --- PRE-CALCULATE LED 3D POSITIONS ---
+    # Crucial for volumetric rendering. We need to know where every LED is in real space.
     led_indices = np.arange(LED_COUNT)
-    led_z_norm = led_indices / LED_COUNT
-    led_theta = (led_indices % (LED_COUNT / PILLAR_WRAPS)) / (LED_COUNT / PILLAR_WRAPS)
+    # Normalized Height (0.0 to 1.0)
+    led_h_norm = led_indices / LED_COUNT
+    # Actual Height Z
+    led_z_world = led_h_norm * HEIGHT_INCHES
+    # Angle Theta (0.0 to 1.0 representing 0 to 2pi)
+    led_theta_norm = (led_indices % (LED_COUNT / PILLAR_WRAPS)) / (LED_COUNT / PILLAR_WRAPS)
+    led_theta_rad = led_theta_norm * 2 * np.pi
+
+    # Cartesian coordinates of LEDs on cylinder surface
+    led_x_world = RADIUS_INCHES * np.cos(led_theta_rad)
+    led_y_world = RADIUS_INCHES * np.sin(led_theta_rad)
+
+    # Stack into (600, 3) array for fast vector math
+    led_pos_world = np.stack([led_x_world, led_y_world, led_z_world], axis=1)
+
+    # Pre-calc standard mapping data for edges
     aspect = HEIGHT_INCHES / CIRCUMFERENCE_INCHES
 
-    dt = 1.0 / FPS
-
+    print("Starting Render Loop...")
     for f in range(TOTAL_FRAMES):
-        if f % 30 == 0: print(f"Frame {f}/{TOTAL_FRAMES}")
-        t = f * dt
+        if f % 10 == 0: print(f"Frame {f}/{TOTAL_FRAMES}")
 
-        # Collect all points from all objects for this frame
-        all_points = []
-        all_colors = []
-        for obj in objects:
-            pts = obj.get_world_points(t)
-            all_points.append(pts)
-            # Repeat color for every point in this object
-            all_colors.append(np.tile(obj.color, (len(pts), 1)))
+        # Time progress 0.0 -> 1.0
+        t_norm = f / TOTAL_FRAMES
+        angle_base = t_norm * 2 * np.pi # 0 to 2pi for perfect looping
 
-        # Combine into one big list of render points
-        render_pos = np.vstack(all_points)
-        render_col = np.vstack(all_colors)
+        # --- MOVEMENT ANIMATION (Looping Sine/Cos) ---
+        # Rotation: Slow tumble on all axes
+        rot_matrix = get_rotation_matrix(
+            angle_base * 1.0, # X rot
+            angle_base * 0.7, # Y rot (different speeds make it look odd)
+            angle_base * 0.3  # Z rot
+        )
 
-        # --- RENDERER ---
-        # (Standard projection logic from previous scripts)
+        # Position: Pass through center.
+        # Use sin/cos combinations to make a complex looping path through origin.
+        # Amplitude needs to be large enough to push it entirely out of the pillar.
+        amp = RADIUS_INCHES + (SUB_CUBE_SIZE * 2)
+        pos_offset = np.array([
+            np.sin(angle_base) * amp, # X Oscillation
+            np.cos(angle_base * 2.0) * (amp * 0.5), # Y Oscillation (faster, smaller)
+            (HEIGHT_INCHES/2.0) + np.sin(angle_base * 0.5) * (HEIGHT_INCHES*0.4) # Z bob up and down
+        ])
 
-        p_x = render_pos[:, 0]
-        p_y = render_pos[:, 1]
-        p_z = render_pos[:, 2]
+        # --- TRANSFORM GEOMETRY ---
+        # 1. Transform Centers (Apply Rotation then Translation)
+        current_centers = (base_centers @ rot_matrix.T) + pos_offset
 
+        # 2. Transform and Densify Edges
+        edge_points = []
+        points_per_edge = 40
+        for p1_tup, p2_tup in base_edges_tuples:
+            # Convert tuple back to array
+            p1_local = np.array(p1_tup)
+            p2_local = np.array(p2_tup)
+            # Transform endpoints
+            p1_world = (p1_local @ rot_matrix.T) + pos_offset
+            p2_world = (p2_local @ rot_matrix.T) + pos_offset
+            # Interpolate
+            for i in range(points_per_edge):
+                mix = i / (points_per_edge - 1)
+                edge_points.append(p1_world * (1-mix) + p2_world * mix)
+        current_edge_points = np.array(edge_points)
+
+        # --- RENDER PASS 1: SURFACES (Volumetric) ---
+        # For every LED, check distance to nearest sub-cube center.
+
+        # Calculate distances from all LEDs to all Cube Centers
+        # (600, 1, 3) - (1, 27, 3) -> Broadcast to (600, 27, 3) differences
+        deltas = led_pos_world[:, np.newaxis, :] - current_centers[np.newaxis, :, :]
+        # Sum of squares along last axis -> (600, 27) squared distances
+        dists_sq = np.sum(deltas**2, axis=2)
+        # Find distance to nearest center for each LED -> (600,)
+        min_dists_sq = np.min(dists_sq, axis=1)
+
+        # Identify LEDs inside the shape
+        surface_mask = min_dists_sq < SURFACE_HIT_RADIUS_SQ
+
+        # Apply Base Surface Color
+        clip_data[f, surface_mask] = COLOR_SURFACE.astype(np.uint8)
+
+        # --- RENDER PASS 2: EDGES (Point Projection) ---
+        # Standard projection of edge points onto surface
+
+        p_x = current_edge_points[:, 0]
+        p_y = current_edge_points[:, 1]
+        p_z = current_edge_points[:, 2]
         p_r = np.sqrt(p_x**2 + p_y**2)
         p_theta = (np.arctan2(p_y, p_x) + np.pi) / (2 * np.pi)
 
-        # Depth Fade (shapes further out are dimmer)
         dist_from_surface = p_r - RADIUS_INCHES
-        brightness = 1.0 - (dist_from_surface / 15.0) # 15 inch fade range
+        # Only render edges that are "in front" or slightly embedded
+        valid_mask = (p_z >= 0) & (p_z <= HEIGHT_INCHES) & (dist_from_surface > -2.0)
+
+        # Depth dimming for edges
+        brightness = 1.0 - (np.abs(dist_from_surface) / 8.0)
         brightness = np.clip(brightness, 0.0, 1.0)
 
-        # Filter
-        valid_mask = (p_z >= 0) & (p_z <= HEIGHT_INCHES) & (dist_from_surface > 0)
         valid_indices = np.where(valid_mask)[0]
 
-        # Optimized Nearest Neighbor Loop
         for idx in valid_indices:
             nz = p_z[idx] / HEIGHT_INCHES
             nt = p_theta[idx]
-
-            d_z = np.abs(led_z_norm - nz) * aspect
-            raw_dt = np.abs(led_theta - nt)
+            d_z = np.abs(led_h_norm - nz) * aspect
+            raw_dt = np.abs(led_theta_norm - nt)
             d_t = np.minimum(raw_dt, 1.0 - raw_dt)
-
             dist_sq = d_z**2 + d_t**2
             nearest = np.argmin(dist_sq)
 
-            # THE KEY TO LOW RES: Large hit radius
-            if dist_sq[nearest] < WIRE_THICKNESS_RADIUS_SQ:
-                b_val = brightness[idx]
-                # Additive Color Mixing
-                r = int(render_col[idx, 0] * 255 * b_val)
-                g = int(render_col[idx, 1] * 255 * b_val)
-                b = int(render_col[idx, 2] * 255 * b_val)
-
-                # Explicit cast and clamp to avoid overflow
-                cur_r = int(clip_data[f, nearest, 0])
-                cur_g = int(clip_data[f, nearest, 1])
-                cur_b = int(clip_data[f, nearest, 2])
-
-                clip_data[f, nearest, 0] = min(255, cur_r + r)
-                clip_data[f, nearest, 1] = min(255, cur_g + g)
-                clip_data[f, nearest, 2] = min(255, cur_b + b)
+            if dist_sq[nearest] < EDGE_THICKNESS_SQ:
+                b = brightness[idx]
+                # Additive blend Edge color on top of Surface color
+                cur = clip_data[f, nearest].astype(int)
+                add = (COLOR_EDGE * b).astype(int)
+                new_col = np.minimum(cur + add, 255)
+                clip_data[f, nearest] = new_col.astype(np.uint8)
 
     print(f"Saving {OUTPUT_FILE}...")
     np.save(OUTPUT_FILE, clip_data)
