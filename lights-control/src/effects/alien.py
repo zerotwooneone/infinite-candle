@@ -22,7 +22,7 @@ GRID_H = 72
 
 # ADJUSTMENT 1 & 2: Ground raised, Sky lowered
 HOVER_H = 53.0
-GROUND_H = 2.0
+GROUND_H = 4.0
 
 class AlienAbductionEffect(GridSystem):
     def __init__(self, config):
@@ -81,7 +81,7 @@ class AlienAbductionEffect(GridSystem):
     def draw_ship_actor(self, x, y):
         # ADJUSTMENT 3: Extended Width from 10 to 20
         # This guarantees full circular coverage with overlap
-        SHIP_WIDTH = 20
+        SHIP_WIDTH = 40
 
         # Top Blue
         self.draw_rect(x, y+4, SHIP_WIDTH, 1, self.c_ship_blue)
@@ -100,7 +100,7 @@ class AlienAbductionEffect(GridSystem):
 
     def draw_person_actor(self, x, y):
         if self.person_abducted: return
-        self.draw_rect(x-1, y, 2, 4, self.c_person)
+        self.draw_rect(x-1, y, 2, 5, self.c_person)
 
     def draw_spotlight(self):
         if not self.show_beam: return
