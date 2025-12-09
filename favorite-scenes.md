@@ -1,5 +1,24 @@
-//candy cane
+//alien
+```json
+{
+  "layers": [
+    {
+      "type": "solid",
+      "color": [0, 0, 1]
+    },
+    {
+      "type": "alien",
+      "speed": 1.0,
+      "transparent": true,
+      "ship_color_1": [50, 150, 255],
+      "ship_color_2": [0, 255, 50],
+      "beam_color": [100, 255, 255]
+    }
+  ]
+}
+```
 
+//candy cane
 ```json
 {
   "layers": [
