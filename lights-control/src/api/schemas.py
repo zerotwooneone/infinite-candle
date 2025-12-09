@@ -74,10 +74,20 @@ class ClipLayer(BaseLayer):
     filename: str
     transparent: bool = False
 
+# src/api/schemas.py
+
+class AlienLayer(BaseLayer):
+    type: Literal["alien"]
+    ship_color_1: List[int] = [50, 150, 255]  # Light Blue lines
+    ship_color_2: List[int] = [0, 255, 50]    # Green Dashed line
+    beam_color: List[int] = [100, 255, 255]   # Cyan Spotlight
+    speed: float = 1.0
+    transparent: bool = True                  # Usually want this overlaid
+
 # Update Union
 EffectConfig = Annotated[
     Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer,
-    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,ClipLayer], # <--- Add
+    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,ClipLayer, AlienLayer], # <--- Add
     Field(discriminator="type")
 ]
 
