@@ -168,3 +168,16 @@ Plasma
 }
 ```
 
+//chrome
+```json
+{
+  "layers": [
+    {
+      "type": "clip",
+      "filename": "chrome_spin.npy"
+    }
+  ]
+}
+```
+
+
