@@ -19,8 +19,8 @@ S12_DARK_END    = 12
 
 GRID_W = 32
 GRID_H = 72
-HOVER_H = 55.0
-GROUND_H = 0.0
+HOVER_H = 57.0
+GROUND_H = 2.0
 
 class AlienAbductionEffect(GridSystem):
     def __init__(self, config):
