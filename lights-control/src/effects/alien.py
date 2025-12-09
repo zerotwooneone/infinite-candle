@@ -59,16 +59,49 @@ class AlienAbductionEffect(GridSystem):
         self.person_abducted = False
 
     def draw_rect(self, x, y, w, h, color, opacity=1.0):
-        ix, iy, iw, ih = int(x), int(y), int(w), int(h)
-        for r in range(iy, iy + ih):
+        """
+        Draws with Vertical Anti-Aliasing.
+        If y is 5.5, it draws 50% on row 5 and 50% on row 6.
+        """
+        # 1. Calculate the fractional part of Y
+        y_int = int(y)
+        y_frac = y - y_int
+
+        # 2. Determine heights
+        # The main body covers 'h' pixels.
+        # But we might need h+1 pixels to handle the partial top/bottom.
+
+        # We will loop through the "Top" coverage to "Bottom" coverage
+        start_row = y_int
+        end_row = int(y + h) # If y=5.5, h=2, y+h=7.5 -> end=7
+
+        # Total logic: We treat the rect as a floating signal
+
+        for r in range(start_row, end_row + 2): # Check rows that might be touched
+            # Calculate vertical coverage for this row 'r'
+            # The row 'r' spans from r.0 to r+1.0
+            # The rect spans from y to y+h
+
+            # Find intersection of [r, r+1] and [y, y+h]
+            overlap_start = max(r, y)
+            overlap_end = min(r + 1, y + h)
+            overlap = overlap_end - overlap_start
+
+            if overlap <= 0: continue # This row isn't touched
+
+            # 'overlap' is between 0.0 and 1.0 -> This is our brightness factor!
+            row_opacity = opacity * overlap
+
+            # Draw the horizontal strip for this row
+            ix = int(x)
+            iw = int(w)
             for c in range(ix, ix + iw):
                 if 0 <= r < self.grid_h:
                     col_idx = c % self.grid_w
-                    if opacity >= 1.0:
-                        self.canvas[r, col_idx] = color
-                    else:
-                        bg = self.canvas[r, col_idx]
-                        self.canvas[r, col_idx] = (bg * (1.0 - opacity)) + (color * opacity)
+
+                    # Blend
+                    bg = self.canvas[r, col_idx]
+                    self.canvas[r, col_idx] = (bg * (1.0 - row_opacity)) + (color * row_opacity)
 
     def draw_at_quadrants(self, draw_func, base_x, *args, **kwargs):
         quad_width = GRID_W // 4
