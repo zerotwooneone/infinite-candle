@@ -10,6 +10,11 @@ def _wrap_distance(a: np.ndarray, b: float) -> np.ndarray:
     return np.minimum(raw, 1.0 - raw)
 
 
+def _wrap_signed_delta(a: np.ndarray, b: float) -> np.ndarray:
+    d = (a - b + 0.5) % 1.0 - 0.5
+    return d
+
+
 class ChristmasTreeEffect(Effect):
     def __init__(self, config):
         super().__init__(config)
@@ -17,6 +22,10 @@ class ChristmasTreeEffect(Effect):
 
         self.rotate_speed = float(getattr(config, "rotate_speed", 0.1))
         self.brightness = float(getattr(config, "brightness", 1.0))
+
+        # Render as a flat "2D" tree on the unwrapped cylinder surface.
+        # We'll draw the same tree on two opposite sides so it's visible from both.
+        self.thickness = float(getattr(config, "thickness", 0.08))
 
         self.ornament_count = int(getattr(config, "ornament_count", 30))
         self.ornament_size = float(getattr(config, "ornament_size", 0.025))
@@ -39,7 +48,8 @@ class ChristmasTreeEffect(Effect):
         self.ornament_palette = np.array(palette, dtype=float)
 
         rng = np.random.default_rng()
-        self.ornament_x = rng.uniform(0.0, 1.0, self.ornament_count)
+        self.ornament_side = rng.integers(0, 2, size=self.ornament_count)
+        self.ornament_x_offset = rng.uniform(-0.5, 0.5, self.ornament_count)
         self.ornament_y = rng.uniform(self.config.h_min, self.config.h_max, self.ornament_count)
         self.ornament_color_idx = rng.integers(0, len(self.ornament_palette), size=self.ornament_count)
 
@@ -57,30 +67,40 @@ class ChristmasTreeEffect(Effect):
         y_norm = np.clip((y - h_min) / height, 0.0, 1.0)
 
         rot = (self.t * self.rotate_speed) % 1.0
-        x_rot = (x + rot) % 1.0
+        center_a = rot
+        center_b = (rot + 0.5) % 1.0
 
         layer = np.zeros(buffer.shape, dtype=float)
 
-        # --- Tree body (cone silhouette)
-        # Make a cone "wedge" centered on x=0.5. Width shrinks toward the top.
+        # --- Tree body (2D silhouette on two thin planes)
+        # For each plane, width shrinks toward the top.
         tree_mask_y = (y >= h_min) & (y <= h_max)
-        half_width = 0.48 * (1.0 - y_norm) + 0.03
-        dx_center = _wrap_distance(x_rot, 0.5)
-        tree_mask = tree_mask_y & (dx_center <= half_width)
+        half_width = (self.thickness * 0.5) * (1.0 - y_norm) + (self.thickness * 0.12)
+
+        dx_a = np.abs(_wrap_signed_delta(x, center_a))
+        dx_b = np.abs(_wrap_signed_delta(x, center_b))
+
+        on_a = tree_mask_y & (dx_a <= half_width)
+        on_b = tree_mask_y & (dx_b <= half_width)
+        tree_mask = on_a | on_b
 
         if np.any(tree_mask):
-            # Subtle shading so it feels dimensional
-            shade = 0.65 + 0.35 * (1.0 - (dx_center / np.maximum(half_width, 1e-6)))
+            # A little shading toward the center of each plane
+            shade_a = 0.65 + 0.35 * (1.0 - (dx_a / np.maximum(half_width, 1e-6)))
+            shade_b = 0.65 + 0.35 * (1.0 - (dx_b / np.maximum(half_width, 1e-6)))
+            shade = np.maximum(shade_a, shade_b)
             shade = shade[:, np.newaxis]
             layer[tree_mask] = (self.tree_color * shade[tree_mask]).astype(float)
 
         # --- Ornaments (colored spots)
         if self.ornament_count > 0:
             led_y = y[np.newaxis, :]
-            led_x = x_rot[np.newaxis, :]
+            led_x = x[np.newaxis, :]
 
             p_y = self.ornament_y[:, np.newaxis]
-            p_x = (self.ornament_x + rot) % 1.0
+            plane_center = np.where(self.ornament_side == 0, center_a, center_b)
+            # Offset scales with thickness to keep ornaments on the tree planes.
+            p_x = (plane_center + (self.ornament_x_offset * self.thickness * 0.45)) % 1.0
             p_x = p_x[:, np.newaxis]
 
             dy = np.abs(led_y - p_y) * mapper.aspect_ratio
@@ -105,13 +125,23 @@ class ChristmasTreeEffect(Effect):
         star_mask_y = (y >= star_y0) & (y <= h_max)
 
         if np.any(star_mask_y):
-            theta = (x_rot - 0.5) * (2.0 * math.pi)
-            # 5-point "spikiness" around the circumference
-            spikes = 0.5 + 0.5 * np.cos(5.0 * theta)
-            # Larger spikes near the very top
             tip = np.clip((y - star_y0) / max(1e-6, (h_max - star_y0)), 0.0, 1.0)
+            star_half_width = (self.thickness * 0.22) * (1.0 - tip) + (self.thickness * 0.06)
+
+            dxa = np.abs(_wrap_signed_delta(x, center_a))
+            dxb = np.abs(_wrap_signed_delta(x, center_b))
+
+            ua = np.clip(_wrap_signed_delta(x, center_a) / np.maximum(star_half_width, 1e-6), -1.0, 1.0)
+            ub = np.clip(_wrap_signed_delta(x, center_b) / np.maximum(star_half_width, 1e-6), -1.0, 1.0)
+
+            # 5-point-ish modulation across the plane width
+            spikes_a = 0.5 + 0.5 * np.cos(5.0 * math.pi * ua)
+            spikes_b = 0.5 + 0.5 * np.cos(5.0 * math.pi * ub)
+            spikes = np.maximum(spikes_a, spikes_b)
+
             spike_threshold = 0.35 + 0.55 * (1.0 - tip)
-            star_mask = star_mask_y & (spikes >= spike_threshold)
+            in_band = (dxa <= star_half_width) | (dxb <= star_half_width)
+            star_mask = star_mask_y & in_band & (spikes >= spike_threshold)
 
             layer[star_mask] = self.star_color
 

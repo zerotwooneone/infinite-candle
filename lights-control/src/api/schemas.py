@@ -88,6 +88,7 @@ class ChristmasTreeLayer(BaseLayer):
     type: Literal["christmas_tree"]
     rotate_speed: float = 0.1
     brightness: float = 1.0
+    thickness: float = 0.08
     ornament_count: int = 30
     ornament_size: float = 0.025
     tree_color: List[int] = [0, 120, 0]
