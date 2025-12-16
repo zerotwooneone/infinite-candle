@@ -8,6 +8,8 @@ from src.effects.lava import LavaLampEffect
 from src.effects.breathing import BreathingEffect
 from src.effects.player import ClipPlayerEffect
 from src.effects.alien import AlienAbductionEffect
+from src.effects.christmas_tree import ChristmasTreeEffect
+
 def create_effect(config):
     t = config.type
     if t == "stripes": return StripesEffect(config)
@@ -20,5 +22,6 @@ def create_effect(config):
     elif t == "breathing": return BreathingEffect(config)
     elif t == "clip": return ClipPlayerEffect(config)
     elif t == "alien": return AlienAbductionEffect(config)
+    elif t == "christmas_tree": return ChristmasTreeEffect(config)
 
     return None
