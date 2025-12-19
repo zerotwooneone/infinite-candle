@@ -74,10 +74,39 @@ class ClipLayer(BaseLayer):
     filename: str
     transparent: bool = False
 
+# src/api/schemas.py
+
+class AlienLayer(BaseLayer):
+    type: Literal["alien"]
+    ship_color_1: List[int] = [50, 150, 255]  # Light Blue lines
+    ship_color_2: List[int] = [0, 255, 50]    # Green Dashed line
+    beam_color: List[int] = [100, 255, 255]   # Cyan Spotlight
+    speed: float = 1.0
+    transparent: bool = True                  # Usually want this overlaid
+
+class ChristmasTreeLayer(BaseLayer):
+    type: Literal["christmas_tree"]
+    rotate_speed: float = 0.1
+    brightness: float = 1.0
+    thickness: float = 0.08
+    ornament_count: int = 30
+    ornament_size: float = 0.025
+    tree_color: List[int] = [0, 120, 0]
+    star_color: List[int] = [255, 220, 0]
+    ornament_palette: List[List[int]] = [
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 120, 255],
+        [255, 0, 255],
+        [255, 140, 0],
+        [0, 255, 255],
+    ]
+    star_height: float = 0.08
+
 # Update Union
 EffectConfig = Annotated[
     Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer,
-    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,ClipLayer], # <--- Add
+    FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,ClipLayer, AlienLayer, ChristmasTreeLayer], # <--- Add
     Field(discriminator="type")
 ]
 

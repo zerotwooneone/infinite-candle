@@ -14,11 +14,11 @@ TOTAL_FRAMES = int(FPS * DURATION_SEC)
 OUTPUT_FILE = "snow_heavy.npy"
 
 # --- REFINED PHYSICS ---
-FLAKE_COUNT = 800  # More flakes for better density
-GRAVITY = 5.0      # Reduced gravity (was 9.8)
+FLAKE_COUNT = 1000  # More flakes for better density
+GRAVITY = 7.0      # Reduced gravity (was 9.8)
 DRAG_COEFF = 5.0   # High Drag = Feather-like falling
-WIND_X = 1.0       # Gentle breeze
-DEPTH_FADE = 6.0   # Deeper fade range (particles visible further back)
+WIND_X = 0.7       # Gentle breeze
+DEPTH_FADE = 24.0   # Deeper fade range (particles visible further back)
 
 def generate_clip():
     print(f"Generating {DURATION_SEC}s of Refined 3D Snow...")
