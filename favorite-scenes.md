@@ -1,4 +1,4 @@
-//alien
+## alien
 ```json
 {
   "layers": [
@@ -18,7 +18,7 @@
 }
 ```
 
-//candy cane
+## candy cane
 ```json
 {
   "layers": [
@@ -40,7 +40,7 @@
 ```
 
 
-//candle
+## candle
 ```json
 {
     "layers": [
@@ -64,7 +64,7 @@
 ```
 
 
-//snow
+## snow
 ```json
 {
   "layers": [
@@ -82,7 +82,7 @@
 ```
 
 
-//lava lamp
+## lava lamp
 ```json
 {
     "layers": [
@@ -99,7 +99,7 @@
 ```
 
 
-//debug - vert lines
+## debug - vert lines
 ```json
 {
     "layers": [
@@ -116,7 +116,7 @@
 ```
 
 
-//fireworks
+## fireworks
 ```json
 {
   "layers": [
@@ -133,7 +133,7 @@
 }
 ```
 
-Geometric Wireframes
+## Geometric Wireframes
 ```json
 {
   "layers": [
@@ -150,7 +150,7 @@ Geometric Wireframes
 }
 ```
 
-Plasma
+## Plasma
 ```json
 {
   "layers": [
@@ -168,13 +168,27 @@ Plasma
 }
 ```
 
-//chrome
+## chrome
 ```json
 {
   "layers": [
     {
       "type": "clip",
       "filename": "chrome_spin.npy"
+    }
+  ]
+}
+```
+
+## rubik's cube
+```json
+{
+  "layers": [
+    
+    {
+      "type": "clip",
+      "filename": "rubiks_solve_loop.npy",
+      "transparent": true
     }
   ]
 }
