@@ -18,6 +18,38 @@
 }
 ```
 
+## fireworks 1
+```json
+{
+    "layers": [
+      {
+        "type": "fireworks",
+        "opacity": 1.0,
+        "h_min": 0.0,
+        "h_max": 1.0,
+
+        "launch_rate": 1.2,
+        "burst_height": 0.78,
+        "explosion_size": 0.02,
+
+        "max_rockets": 2,
+        "max_sparks": 400,
+        "spark_density": 0.8,
+
+        "rocket_speed": 0.99,
+        "rocket_wiggle": 0.02,
+        "rocket_gravity": -0.35,
+
+        "spark_gravity": -0.85,
+        "spark_drag": 0.50,
+
+        "trail_decay": 2.8,
+        "brightness": 1.0
+      }
+    ]
+  }
+```
+
 ## candy cane
 ```json
 {
