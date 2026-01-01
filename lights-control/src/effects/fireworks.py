@@ -43,7 +43,7 @@ class FireworkEffect(Effect):
 
         self.launch_rate = float(getattr(config, "launch_rate", 0.5))
         self.burst_height = float(getattr(config, "burst_height", 0.8))
-        self.explosion_size = float(getattr(config, "explosion_size", 0.55))
+        self.explosion_size = float(getattr(config, "explosion_size", 0.15))
 
         self.max_rockets = int(getattr(config, "max_rockets", 6))
         self.max_sparks = int(getattr(config, "max_sparks", 1400))
