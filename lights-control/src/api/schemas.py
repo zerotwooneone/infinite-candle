@@ -48,6 +48,20 @@ class FireworkLayer(BaseLayer):
     burst_height: float = 0.8
     explosion_size: float = 0.15
 
+    max_rockets: int = 6
+    max_sparks: int = 1400
+    spark_density: float = 1.0
+
+    rocket_speed: float = 0.95
+    rocket_wiggle: float = 0.08
+    rocket_gravity: float = -0.35
+
+    spark_gravity: float = -0.65
+    spark_drag: float = 0.10
+
+    trail_decay: float = 2.8
+    brightness: float = 1.0
+
 class GameOfLifeLayer(BaseLayer):
     type: Literal["gol"]
     color: List[int] = [0, 255, 0]
