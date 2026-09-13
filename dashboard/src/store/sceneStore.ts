@@ -91,7 +91,7 @@ interface SceneState {
 
 export const useSceneStore = create<SceneState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       activeLayers: [],
       savedScenes: [],
       

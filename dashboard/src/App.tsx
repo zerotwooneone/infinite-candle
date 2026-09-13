@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SceneDashboard } from './components/SceneDashboard';
 import { LayerManager } from './components/LayerManager';
 import { LayerInspector } from './components/LayerInspector';

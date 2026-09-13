@@ -1,6 +1,5 @@
 import React from 'react';
 import { useSceneStore, FACTORY_PRESETS } from '../store/sceneStore';
-import { LayerConfig } from '../types/schemas';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
