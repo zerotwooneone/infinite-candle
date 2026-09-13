@@ -1,4 +1,4 @@
-﻿# lights-control/src/config.py
+# lights-control/src/config.py
 import os
 
 # Hardware Settings
@@ -9,6 +9,10 @@ LED_DMA = 10             # DMA Channel
 LED_BRIGHTNESS = 255     # 0-255 (We limit current in WLED, but here we do it via max brightness)
 LED_INVERT = False
 LED_CHANNEL = 0
+
+# If True, attempt to alias the driver's internal DMA buffer and push frames
+# with a single bulk copy. Set to False to force the safe per-pixel path.
+LED_BULK_WRITE = True
 
 # Geometry Settings
 PILLAR_WRAPS = 19.4        # How many times the strip circles the pillar

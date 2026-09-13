@@ -1,4 +1,5 @@
-﻿import time
+import threading
+import time
 import numpy as np
 from src.drivers.led_interface import LEDInterface
 from src.engine.mapper import PillarMapper
@@ -12,6 +13,10 @@ class Engine:
         self.active_effects = []
         self.buffer = np.zeros((LED_COUNT, 3), dtype=np.uint8)
         self.running = False
+        # Snapshot of the last composited frame for WebSocket streaming.
+        # Guarded by _stream_lock so readers never see a torn frame.
+        self._stream_lock = threading.Lock()
+        self._stream_frame = np.zeros((LED_COUNT, 3), dtype=np.uint8)
 
     def update_layers(self, layer_configs):
         """
@@ -39,8 +44,16 @@ class Engine:
                 effect.update(dt)
                 effect.render(self.buffer, self.mapper)
 
+            with self._stream_lock:
+                np.copyto(self._stream_frame, self.buffer)
+
             self.driver.show(self.buffer)
             time.sleep(0.001)
+
+    def get_stream_frame(self) -> bytes:
+        """Return the latest composited frame as raw RGB bytes (600*3 = 1800)."""
+        with self._stream_lock:
+            return self._stream_frame.tobytes()
 
     def stop_loop(self):
         self.running = False

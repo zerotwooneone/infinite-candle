@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSceneStore } from '../store/sceneStore';
+import { API_BASE } from '../config';
 import { Play } from 'lucide-react';
 
 export const ActionBar: React.FC = () => {
@@ -12,7 +13,7 @@ export const ActionBar: React.FC = () => {
       // Clean up internal IDs before sending to backend
       const payload = activeLayers.map(({ id, ...rest }) => rest);
       
-      const res = await fetch('http://10.0.217.7:8000/scene', {
+      const res = await fetch(`${API_BASE}/scene`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ layers: payload })

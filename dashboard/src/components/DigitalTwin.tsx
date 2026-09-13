@@ -3,71 +3,91 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSceneStore } from '../store/sceneStore';
+import { API_BASE, WS_STREAM_URL } from '../config';
+import { simulateFrame } from '../sim/engineSim';
 
 const LED_COUNT = 600;
+const FRAME_BYTES = LED_COUNT * 3;
 
-const LEDMesh = ({ coordsX, coordsY }: { coordsX: number[], coordsY: number[] }) => {
+type FrameRef = React.MutableRefObject<Uint8Array | null>;
+
+const LEDMesh = ({ coordsX, coordsY, frameRef, devMode }: { coordsX: number[], coordsY: number[], frameRef: FrameRef, devMode: boolean }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const { activeLayers } = useSceneStore();
-  
+
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
-  
+  const simBuf = useMemo(() => new Uint8Array(FRAME_BYTES), []);
+
+  // Position instances once — geometry never changes.
   useEffect(() => {
     if (!meshRef.current) return;
-    
-    // Geometry translation
+
     const radius = 21.0 / (2 * Math.PI); // ~3.34
-    
+
     for (let i = 0; i < LED_COUNT; i++) {
-      const h = coordsY[i]; // 0.0 to 1.0
-      const a = coordsX[i]; // 0.0 to 1.0
-      
-      const y = (h * 48.0) - 24.0; 
+      const h = coordsY[i];
+      const a = coordsX[i];
+
+      const y = (h * 48.0) - 24.0;
       const theta = a * Math.PI * 2;
-      const x = Math.cos(theta) * radius;
-      const z = Math.sin(theta) * radius;
-      
-      dummy.position.set(x, y, z);
+      dummy.position.set(Math.cos(theta) * radius, y, Math.sin(theta) * radius);
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
-      
-      // VERY basic visual proxy: If solid layer exists, use its color. Otherwise fallback.
-      // A true proxy would evaluate the generative math here, but we'll do a simple mock.
-      let r=0, g=0, b=0;
-      
-      // Evaluate bottom to top
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  }, [coordsX, coordsY]);
+
+  // Static proxy colors — only applied when no live stream is available.
+  useEffect(() => {
+    if (!meshRef.current || frameRef.current) return;
+
+    for (let i = 0; i < LED_COUNT; i++) {
+      const h = coordsY[i];
+      let r = 0, g = 0, b = 0;
+
       activeLayers.forEach(layer => {
         if (h >= (layer.h_min ?? 0) && h <= (layer.h_max ?? 1)) {
+          const op = layer.opacity ?? 1.0;
           if (layer.type === 'solid' && (layer as any).color) {
             const [lr, lg, lb] = (layer as any).color;
-            // blend based on opacity
-            const op = layer.opacity ?? 1.0;
-            r = r * (1-op) + (lr/255) * op;
-            g = g * (1-op) + (lg/255) * op;
-            b = b * (1-op) + (lb/255) * op;
+            r = r * (1 - op) + (lr / 255) * op;
+            g = g * (1 - op) + (lg / 255) * op;
+            b = b * (1 - op) + (lb / 255) * op;
           }
-          // Mock other layers simply
           if (layer.type === 'fire') {
-            const op = layer.opacity ?? 1.0;
-            r = r * (1-op) + 1.0 * op;
-            g = g * (1-op) + 0.3 * op;
+            r = r * (1 - op) + 1.0 * op;
+            g = g * (1 - op) + 0.3 * op;
           }
         }
       });
-      
-      // Default dim ambient if black
-      if (r===0 && g===0 && b===0) {
-        r = 0.05; g = 0.05; b = 0.05;
-      }
+
+      if (r === 0 && g === 0 && b === 0) { r = 0.05; g = 0.05; b = 0.05; }
 
       color.setRGB(r, g, b);
       meshRef.current.setColorAt(i, color);
     }
-    
-    meshRef.current.instanceMatrix.needsUpdate = true;
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
-  }, [coordsX, coordsY, activeLayers]);
+  }, [coordsY, activeLayers]);
+
+  // Per-tick color update: live stream wins, then dev-mode sim, else keep static proxy.
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+
+    let frame = frameRef.current;
+    if (devMode) {
+      simulateFrame(activeLayers, clock.elapsedTime, coordsX, coordsY, simBuf);
+      frame = simBuf;
+    }
+    if (!frame || frame.length < FRAME_BYTES) return;
+
+    for (let i = 0; i < LED_COUNT; i++) {
+      const o = i * 3;
+      color.setRGB(frame[o] / 255, frame[o + 1] / 255, frame[o + 2] / 255);
+      meshRef.current.setColorAt(i, color);
+    }
+    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+  });
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, LED_COUNT]}>
@@ -78,20 +98,22 @@ const LEDMesh = ({ coordsX, coordsY }: { coordsX: number[], coordsY: number[] })
 }
 
 export const DigitalTwin: React.FC = () => {
-  const [mapping, setMapping] = useState<{coords_x: number[], coords_y: number[]} | null>(null);
-  
+  const [mapping, setMapping] = useState<{ coords_x: number[], coords_y: number[] } | null>(null);
+  const [live, setLive] = useState(false);
+  const [devMode, setDevMode] = useState(false);
+  const frameRef = useRef<Uint8Array | null>(null);
+
+  // Fetch physical mapping (with offline fallback).
   useEffect(() => {
-    // Attempt to fetch from local hardware
-    fetch('http://10.0.217.7:8000/mapping')
+    fetch(`${API_BASE}/mapping`)
       .then(r => r.json())
       .then(data => setMapping(data))
       .catch(e => {
         console.error("Failed to fetch mapping, generating fallback", e);
-        // Fallback spiral generation if backend offline
-        const cx = [];
-        const cy = [];
+        const cx: number[] = [];
+        const cy: number[] = [];
         const wraps = 19.4;
-        for (let i=0; i<LED_COUNT; i++) {
+        for (let i = 0; i < LED_COUNT; i++) {
           cy.push(i / LED_COUNT);
           cx.push((i % (LED_COUNT / wraps)) / (LED_COUNT / wraps));
         }
@@ -99,14 +121,71 @@ export const DigitalTwin: React.FC = () => {
       });
   }, []);
 
+  // Live frame stream from the Pi — raw 1800-byte binary frames at ~15 FPS.
+  // Skipped entirely in dev mode so the dashboard works without hardware.
+  useEffect(() => {
+    if (devMode) {
+      setLive(false);
+      frameRef.current = null;
+      return;
+    }
+
+    let ws: WebSocket | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+
+    const connect = () => {
+      if (disposed) return;
+      ws = new WebSocket(WS_STREAM_URL);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onmessage = (evt) => {
+        frameRef.current = new Uint8Array(evt.data as ArrayBuffer);
+      };
+      ws.onopen = () => setLive(true);
+      ws.onclose = () => {
+        setLive(false);
+        frameRef.current = null;
+        if (!disposed) retry = setTimeout(connect, 2000);
+      };
+      ws.onerror = () => ws?.close();
+    };
+
+    connect();
+    return () => {
+      disposed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
+  }, [devMode]);
+
   return (
-    <div className="bg-black rounded-lg overflow-hidden h-[600px] border border-zinc-800">
+    <div className="bg-black rounded-lg overflow-hidden h-[600px] border border-zinc-800 relative">
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+        <span className="text-xs px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700">
+          {devMode
+            ? <span className="text-amber-400">● DEV SIM</span>
+            : live
+              ? <span className="text-green-400">● LIVE</span>
+              : <span className="text-zinc-500">○ OFFLINE (proxy)</span>}
+        </span>
+        <button
+          onClick={() => setDevMode(d => !d)}
+          className={`text-xs px-2 py-1 rounded border transition-colors ${
+            devMode
+              ? 'bg-amber-900/60 border-amber-700 text-amber-300'
+              : 'bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:text-white'
+          }`}
+        >
+          {devMode ? 'Go Live' : 'Dev Mode'}
+        </button>
+      </div>
       {mapping ? (
         <Canvas camera={{ position: [0, 0, 40], fov: 50 }}>
           <color attach="background" args={['#050505']} />
           <ambientLight intensity={0.5} />
           <OrbitControls autoRotate autoRotateSpeed={0.5} />
-          <LEDMesh coordsX={mapping.coords_x} coordsY={mapping.coords_y} />
+          <LEDMesh coordsX={mapping.coords_x} coordsY={mapping.coords_y} frameRef={frameRef} devMode={devMode} />
         </Canvas>
       ) : (
         <div className="flex items-center justify-center h-full text-zinc-500">

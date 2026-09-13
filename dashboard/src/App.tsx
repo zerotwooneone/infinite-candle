@@ -4,17 +4,26 @@ import { LayerManager } from './components/LayerManager';
 import { LayerInspector } from './components/LayerInspector';
 import { ActionBar } from './components/ActionBar';
 import { DigitalTwin } from './components/DigitalTwin';
-import { useSceneStore, FACTORY_PRESETS } from './store/sceneStore';
+import { useSceneStore } from './store/sceneStore';
+import { API_BASE } from './config';
+
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 function App() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  const { savedScenes, saveScene, activeLayers } = useSceneStore();
-  
-  // Initialize with empty factory preset behavior
+  const { setActiveLayers } = useSceneStore();
+
+  // Rehydrate from the Pi's authoritative state on mount.
+  // The backend is the source of truth — localStorage is just a draft cache.
   useEffect(() => {
-    if (savedScenes.length === 0 && activeLayers.length === 0) {
-      // It's pristine, let's just leave it empty or load the first factory preset
-    }
+    fetch(`${API_BASE}/scene`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.layers?.length) {
+          setActiveLayers(data.layers.map((l: any) => ({ ...l, id: generateId() })));
+        }
+      })
+      .catch(e => console.warn('Could not fetch active scene from Pi:', e));
   }, []);
 
   return (
