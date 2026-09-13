@@ -11,6 +11,10 @@ class StripesEffect(Effect):
         self.c_a = np.array(config.color_a, dtype=float)
         self.c_b = np.array(config.color_b, dtype=float)
 
+        # Height mask (consistent with solid.py etc.)
+        self.h_min = config.h_min
+        self.h_max = config.h_max
+
         # --- SEAMLESS MATH CALCULATION ---
 
         # 1. Calculate ideal geometric components
@@ -82,12 +86,15 @@ class StripesEffect(Effect):
         # 4. Color Blend
         final_colors = (self.c_a * mix) + (self.c_b * (1.0 - mix))
 
+        # 5. Height Mask — only draw inside [h_min, h_max]
+        mask = (mapper.coords_y >= self.h_min) & (mapper.coords_y <= self.h_max)
+
         alpha = self.config.opacity
     
         if alpha >= 1.0:
-            buffer[:] = final_colors.astype(np.uint8)
+            buffer[mask] = final_colors[mask].astype(np.uint8)
         else:
-            # Vectorized Blend for the whole strip
-            current_buffer = buffer.astype(float)
-            blended = (current_buffer * (1.0 - alpha)) + (final_colors * alpha)
-            buffer[:] = blended.astype(np.uint8)
+            # Vectorized Blend for the masked region
+            current_buffer = buffer[mask].astype(float)
+            blended = (current_buffer * (1.0 - alpha)) + (final_colors[mask] * alpha)
+            buffer[mask] = blended.astype(np.uint8)

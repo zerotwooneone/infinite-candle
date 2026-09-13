@@ -75,6 +75,16 @@ export const FACTORY_PRESETS = [
     layers: [
       { id: generateId(), type: 'clip', filename: 'rubiks_solve_loop.npy', transparent: true }
     ]
+  },
+  {
+    name: 'Lighthouse',
+    layers: [
+      // Tower body: dim red/white bands. angle≈24° is the shallowest helix that
+      // yields ~5 band pairs (stripes can't do true horizontal — freq_x >= 1).
+      { id: generateId(), type: 'stripes', color_a: [110, 0, 0], color_b: [95, 95, 95], angle: 24.0, width: 0.1, speed: 0, h_min: 0.0, h_max: 0.85 },
+      // Lantern room: two opposite ~90° white wedges sweeping at ~5s/rev.
+      { id: generateId(), type: 'stripes', color_a: [255, 255, 255], color_b: [0, 0, 0], angle: 0.0, width: 0.25, speed: 1.3, h_min: 0.85, h_max: 1.0 }
+    ]
   }
 ] as any[];
 
