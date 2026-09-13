@@ -1,6 +1,10 @@
 # Infinite Candle 🕯️
 
-> **Status:** Active Development
+<div align="center">
+  <video src="candle.mp4" height="480" controls muted loop autoplay></video>
+</div>
+
+> **Status:** Developing new animations
 
 **Infinite Candle** is a hardware/software platform for controlling a high-density, spirally-wrapped LED pillar. It transforms a standard 4-foot column into a Wi-Fi-enabled, algorithmic light display capable of rendering complex layered effects, weather-reactive patterns, and Cthulhu-summoning rituals.
 
