@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # 1. Import the schemas we defined
 #    This brings in the "smart" SceneRequest that handles Stripes/Snow/etc.
 from src.api.schemas import SceneRequest, SolidLayer
@@ -43,6 +45,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Routes ---
 
 @app.post("/scene")
@@ -59,6 +69,13 @@ async def set_scene(scene: SceneRequest):
 @app.get("/status")
 async def get_status():
     return {"running": engine.running}
+
+@app.get("/mapping")
+async def get_mapping():
+    return {
+        "coords_x": engine.mapper.coords_x.tolist(),
+        "coords_y": engine.mapper.coords_y.tolist()
+    }
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
