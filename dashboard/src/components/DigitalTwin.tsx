@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSceneStore } from '../store/sceneStore';
@@ -8,6 +8,37 @@ import { simulateFrame } from '../sim/engineSim';
 
 const LED_COUNT = 600;
 const FRAME_BYTES = LED_COUNT * 3;
+
+// Camera fit: pillar is 48 units tall, radius ~3.34. On mount we solve the
+// camera distance from the pillar's bounding sphere against the SMALLER of
+// the vertical/horizontal FOV, so the whole structure is framed on any aspect.
+const PILLAR_HEIGHT = 48;
+const PILLAR_RADIUS = 21.0 / (2 * Math.PI);
+const CAM_FOV = 50;
+
+const CameraRig = () => {
+  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
+  const size = useThree(s => s.size);
+
+  useEffect(() => {
+    const aspect = size.width / size.height;
+    if (!Number.isFinite(aspect) || aspect <= 0) return;
+
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+    const fitFov = Math.min(vFov, hFov);
+
+    const boundingRadius = Math.hypot(PILLAR_HEIGHT / 2, PILLAR_RADIUS);
+    const dist = (boundingRadius / Math.sin(fitFov / 2)) * 1.1; // 10% margin
+
+    camera.position.set(0, 4, dist);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // fit once on mount — never fight the user's zoom/orbit
+
+  return null;
+};
 
 type FrameRef = React.MutableRefObject<Uint8Array | null>;
 
@@ -160,7 +191,7 @@ export const DigitalTwin: React.FC = () => {
   }, [devMode]);
 
   return (
-    <div className="bg-black rounded-lg overflow-hidden h-[600px] border border-zinc-800 relative">
+    <div className="bg-black rounded-lg overflow-hidden h-full min-h-[600px] border border-zinc-800 relative">
       <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
         <span className="text-xs px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700">
           {devMode
@@ -181,10 +212,11 @@ export const DigitalTwin: React.FC = () => {
         </button>
       </div>
       {mapping ? (
-        <Canvas camera={{ position: [0, 0, 40], fov: 50 }}>
+        <Canvas camera={{ position: [0, 4, 62], fov: CAM_FOV }}>
           <color attach="background" args={['#050505']} />
           <ambientLight intensity={0.5} />
-          <OrbitControls autoRotate autoRotateSpeed={0.5} />
+          <CameraRig />
+          <OrbitControls autoRotate autoRotateSpeed={0.5} makeDefault />
           <LEDMesh coordsX={mapping.coords_x} coordsY={mapping.coords_y} frameRef={frameRef} devMode={devMode} />
         </Canvas>
       ) : (

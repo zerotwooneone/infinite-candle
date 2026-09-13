@@ -27,27 +27,25 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-950 pb-24">
-      <header className="bg-zinc-900 border-b border-zinc-800 p-4">
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
+      <header className="bg-zinc-900 border-b border-zinc-800 p-4 shrink-0">
         <h1 className="text-2xl font-bold text-white tracking-wider flex items-center">
           <span className="mr-2">🕯️</span> Infinite Candle Control
         </h1>
       </header>
 
-      <main className="p-6 max-w-7xl mx-auto grid grid-cols-12 gap-6">
-        {/* Left Column: Presets & Inspector */}
-        <div className="col-span-12 md:col-span-3 space-y-6">
-          <SceneDashboard />
-          <LayerInspector selectedLayerId={selectedLayerId} />
-        </div>
-        
-        {/* Middle Column: Layer Stack */}
-        <div className="col-span-12 md:col-span-4">
+      <main className="flex-1 min-h-0 w-full max-w-[1920px] mx-auto p-6 pb-24 grid grid-cols-12 gap-6">
+        {/* Left half: controls (presets + inspector | layer stack) */}
+        <div className="col-span-12 min-[1700px]:col-span-6 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 content-start">
+          <div className="space-y-6">
+            <SceneDashboard />
+            <LayerInspector selectedLayerId={selectedLayerId} />
+          </div>
           <LayerManager selectedLayerId={selectedLayerId} setSelectedLayerId={setSelectedLayerId} />
         </div>
 
-        {/* Right Column: 3D Twin */}
-        <div className="col-span-12 md:col-span-5">
+        {/* Right half: 3D twin — ~50% of screen, min 800x600 */}
+        <div className="col-span-12 min-[1700px]:col-span-6 min-h-[600px]">
           <DigitalTwin />
         </div>
       </main>
