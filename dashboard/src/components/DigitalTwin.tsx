@@ -42,13 +42,41 @@ const CameraRig = () => {
 
 type FrameRef = React.MutableRefObject<Uint8Array | null>;
 
-const LEDMesh = ({ coordsX, coordsY, frameRef, devMode }: { coordsX: number[], coordsY: number[], frameRef: FrameRef, devMode: boolean }) => {
+// Material with a patched shader: each instance carries an outward-facing
+// normal (aOutward). When uRealistic=1, fragments viewed from behind the
+// strip face are dimmed to ~3% — the LED's backing, not its emitter.
+const createLedMaterial = () => {
+  const m = new THREE.MeshBasicMaterial({ toneMapped: false });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uRealistic = { value: 0 };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>',
+        '#include <common>\nattribute vec3 aOutward;\nvarying vec3 vOutward;\nvarying vec3 vWorldPos;')
+      .replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvOutward = aOutward;\nvWorldPos = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>',
+        '#include <common>\nuniform float uRealistic;\nvarying vec3 vOutward;\nvarying vec3 vWorldPos;')
+      .replace('#include <color_fragment>',
+        `#include <color_fragment>
+        if (uRealistic > 0.5) {
+          vec3 viewDir = normalize(cameraPosition - vWorldPos);
+          float facing = smoothstep(-0.15, 0.25, dot(normalize(vOutward), viewDir));
+          diffuseColor.rgb *= mix(0.03, 1.0, facing);
+        }`);
+    m.userData.shader = shader;
+  };
+  return m;
+};
+
+const LEDMesh = ({ coordsX, coordsY, frameRef, devMode, realistic }: { coordsX: number[], coordsY: number[], frameRef: FrameRef, devMode: boolean, realistic: boolean }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const { activeLayers } = useSceneStore();
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
   const simBuf = useMemo(() => new Uint8Array(FRAME_BYTES), []);
+  const ledMaterial = useMemo(createLedMaterial, []);
 
   // Position instances once — geometry never changes.
   useEffect(() => {
@@ -67,7 +95,23 @@ const LEDMesh = ({ coordsX, coordsY, frameRef, devMode }: { coordsX: number[], c
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
     meshRef.current.instanceMatrix.needsUpdate = true;
+
+    // Per-instance outward normal (radial direction) for backside dimming.
+    const outward = new Float32Array(LED_COUNT * 3);
+    for (let i = 0; i < LED_COUNT; i++) {
+      const theta = coordsX[i] * Math.PI * 2;
+      outward[i * 3] = Math.cos(theta);
+      outward[i * 3 + 1] = 0;
+      outward[i * 3 + 2] = Math.sin(theta);
+    }
+    meshRef.current.geometry.setAttribute('aOutward', new THREE.InstancedBufferAttribute(outward, 3));
   }, [coordsX, coordsY]);
+
+  // Flip the shader uniform when the view mode toggles (no recompile needed).
+  useEffect(() => {
+    const shader = ledMaterial.userData.shader;
+    if (shader) shader.uniforms.uRealistic.value = realistic ? 1 : 0;
+  }, [realistic, ledMaterial]);
 
   // Static proxy colors — only applied when no live stream is available.
   useEffect(() => {
@@ -121,10 +165,19 @@ const LEDMesh = ({ coordsX, coordsY, frameRef, devMode }: { coordsX: number[], c
   });
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, LED_COUNT]}>
-      <sphereGeometry args={[0.2, 8, 8]} />
-      <meshBasicMaterial toneMapped={false} />
-    </instancedMesh>
+    <group>
+      {realistic && (
+        // Opaque pillar body — occludes the far side of the strip.
+        <mesh>
+          <cylinderGeometry args={[PILLAR_RADIUS - 0.3, PILLAR_RADIUS - 0.3, PILLAR_HEIGHT, 32]} />
+          <meshBasicMaterial color="#0b0b0d" />
+        </mesh>
+      )}
+      <instancedMesh ref={meshRef} args={[undefined, undefined, LED_COUNT]}>
+        <sphereGeometry args={[0.2, 8, 8]} />
+        <primitive object={ledMaterial} attach="material" />
+      </instancedMesh>
+    </group>
   );
 }
 
@@ -132,6 +185,7 @@ export const DigitalTwin: React.FC = () => {
   const [mapping, setMapping] = useState<{ coords_x: number[], coords_y: number[] } | null>(null);
   const [live, setLive] = useState(false);
   const [devMode, setDevMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'xray' | 'realistic'>('realistic');
   const frameRef = useRef<Uint8Array | null>(null);
 
   // Fetch physical mapping (with offline fallback).
@@ -210,6 +264,24 @@ export const DigitalTwin: React.FC = () => {
         >
           {devMode ? 'Go Live' : 'Dev Mode'}
         </button>
+        <div className="flex rounded border border-zinc-700 overflow-hidden text-xs">
+          <button
+            onClick={() => setViewMode('xray')}
+            className={`px-2 py-1 transition-colors ${
+              viewMode === 'xray' ? 'bg-zinc-700 text-white' : 'bg-zinc-900/80 text-zinc-400 hover:text-white'
+            }`}
+          >
+            X-Ray
+          </button>
+          <button
+            onClick={() => setViewMode('realistic')}
+            className={`px-2 py-1 transition-colors ${
+              viewMode === 'realistic' ? 'bg-zinc-700 text-white' : 'bg-zinc-900/80 text-zinc-400 hover:text-white'
+            }`}
+          >
+            Realistic
+          </button>
+        </div>
       </div>
       {mapping ? (
         <Canvas camera={{ position: [0, 4, 62], fov: CAM_FOV }}>
@@ -217,7 +289,7 @@ export const DigitalTwin: React.FC = () => {
           <ambientLight intensity={0.5} />
           <CameraRig />
           <OrbitControls autoRotate autoRotateSpeed={0.5} makeDefault />
-          <LEDMesh coordsX={mapping.coords_x} coordsY={mapping.coords_y} frameRef={frameRef} devMode={devMode} />
+          <LEDMesh coordsX={mapping.coords_x} coordsY={mapping.coords_y} frameRef={frameRef} devMode={devMode} realistic={viewMode === 'realistic'} />
         </Canvas>
       ) : (
         <div className="flex items-center justify-center h-full text-zinc-500">
