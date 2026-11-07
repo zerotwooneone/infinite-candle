@@ -3,7 +3,57 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply antialiased;
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
   }
+
+  html, body {
+    @apply antialiased bg-zinc-950 text-slate-200;
+    min-height: 100%;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom sleek dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(24, 24, 27, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(82, 82, 91, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 113, 122, 0.8);
+}
+
+/* Slider styling for mobile touch friendliness */
+input[type=range] {
+  -webkit-appearance: none;
+  background: #27272a;
+  border-radius: 9999px;
+  height: 8px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease;
+}
+input[type=range]::-webkit-slider-thumb:hover,
+input[type=range]::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+  background: #60a5fa;
 }

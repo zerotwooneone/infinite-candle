@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useSceneStore } from '../store/sceneStore';
 import { API_BASE, WS_STREAM_URL } from '../config';
 import { simulateFrame } from '../sim/engineSim';
+import { Maximize2, Minimize2, RotateCcw, Play, Pause } from 'lucide-react';
 
 const LED_COUNT = 600;
 const FRAME_BYTES = LED_COUNT * 3;
@@ -16,7 +17,7 @@ const PILLAR_HEIGHT = 48;
 const PILLAR_RADIUS = 21.0 / (2 * Math.PI);
 const CAM_FOV = 50;
 
-const CameraRig = () => {
+const CameraRig = ({ resetTrigger }: { resetTrigger: number }) => {
   const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
   const size = useThree(s => s.size);
 
@@ -29,13 +30,12 @@ const CameraRig = () => {
     const fitFov = Math.min(vFov, hFov);
 
     const boundingRadius = Math.hypot(PILLAR_HEIGHT / 2, PILLAR_RADIUS);
-    const dist = (boundingRadius / Math.sin(fitFov / 2)) * 1.1; // 10% margin
+    const dist = (boundingRadius / Math.sin(fitFov / 2)) * 1.15; // 15% margin
 
     camera.position.set(0, 4, dist);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // fit once on mount — never fight the user's zoom/orbit
+  }, [resetTrigger, size.width, size.height, camera]);
 
   return null;
 };
@@ -105,7 +105,7 @@ const LEDMesh = ({ coordsX, coordsY, frameRef, devMode, realistic }: { coordsX: 
       outward[i * 3 + 2] = Math.sin(theta);
     }
     meshRef.current.geometry.setAttribute('aOutward', new THREE.InstancedBufferAttribute(outward, 3));
-  }, [coordsX, coordsY]);
+  }, [coordsX, coordsY, dummy]);
 
   // Flip the shader uniform when the view mode toggles (no recompile needed).
   useEffect(() => {
@@ -143,7 +143,7 @@ const LEDMesh = ({ coordsX, coordsY, frameRef, devMode, realistic }: { coordsX: 
       meshRef.current.setColorAt(i, color);
     }
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
-  }, [coordsY, activeLayers]);
+  }, [coordsY, activeLayers, color, frameRef]);
 
   // Per-tick color update: live stream wins, then dev-mode sim, else keep static proxy.
   useFrame(({ clock }) => {
@@ -179,14 +179,28 @@ const LEDMesh = ({ coordsX, coordsY, frameRef, devMode, realistic }: { coordsX: 
       </instancedMesh>
     </group>
   );
-}
+};
 
-export const DigitalTwin: React.FC = () => {
+export const DigitalTwin: React.FC<{ className?: string }> = ({ className = '' }) => {
   const [mapping, setMapping] = useState<{ coords_x: number[], coords_y: number[] } | null>(null);
   const [live, setLive] = useState(false);
   const [devMode, setDevMode] = useState(false);
   const [viewMode, setViewMode] = useState<'xray' | 'realistic'>('realistic');
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [resetTrigger, setResetTrigger] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const frameRef = useRef<Uint8Array | null>(null);
+
+  // Handle escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch physical mapping (with offline fallback).
   useEffect(() => {
@@ -245,57 +259,142 @@ export const DigitalTwin: React.FC = () => {
   }, [devMode]);
 
   return (
-    <div className="bg-black rounded-lg overflow-hidden h-full min-h-[600px] border border-zinc-800 relative">
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-        <span className="text-xs px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700">
-          {devMode
-            ? <span className="text-amber-400">● DEV SIM</span>
-            : live
-              ? <span className="text-green-400">● LIVE</span>
-              : <span className="text-zinc-500">○ OFFLINE (proxy)</span>}
-        </span>
-        <button
-          onClick={() => setDevMode(d => !d)}
-          className={`text-xs px-2 py-1 rounded border transition-colors ${
-            devMode
-              ? 'bg-amber-900/60 border-amber-700 text-amber-300'
-              : 'bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:text-white'
-          }`}
-        >
-          {devMode ? 'Go Live' : 'Dev Mode'}
-        </button>
-        <div className="flex rounded border border-zinc-700 overflow-hidden text-xs">
+    <div
+      className={`bg-zinc-950 rounded-xl overflow-hidden border border-zinc-800 relative transition-all duration-300 flex flex-col ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 rounded-none border-0 h-screen w-screen'
+          : `h-full min-h-[300px] sm:min-h-[400px] md:min-h-[480px] lg:min-h-[520px] ${className}`
+      }`}
+    >
+      {/* Top Controls Overlay */}
+      <div className="absolute top-0 left-0 right-0 z-10 p-2 sm:p-3 flex items-center justify-between gap-2 pointer-events-none bg-gradient-to-b from-zinc-950/80 via-zinc-950/40 to-transparent">
+        {/* Status Pill */}
+        <div className="pointer-events-auto flex items-center gap-1.5">
+          <span className="text-[11px] sm:text-xs px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-700/80 backdrop-blur-md shadow-sm flex items-center gap-1.5 font-medium">
+            {devMode ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-amber-300">DEV SIM</span>
+              </>
+            ) : live ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-300">LIVE</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-zinc-500" />
+                <span className="text-zinc-400">OFFLINE</span>
+              </>
+            )}
+          </span>
+        </div>
+
+        {/* Action Controls */}
+        <div className="pointer-events-auto flex items-center flex-wrap justify-end gap-1 sm:gap-1.5">
+          {/* Dev Mode toggle */}
           <button
-            onClick={() => setViewMode('xray')}
-            className={`px-2 py-1 transition-colors ${
-              viewMode === 'xray' ? 'bg-zinc-700 text-white' : 'bg-zinc-900/80 text-zinc-400 hover:text-white'
+            onClick={() => setDevMode(d => !d)}
+            className={`text-[11px] sm:text-xs px-2.5 py-1 rounded-lg border font-medium backdrop-blur-md transition-all active:scale-95 shadow-sm ${
+              devMode
+                ? 'bg-amber-950/70 border-amber-600/80 text-amber-200 hover:bg-amber-900/80'
+                : 'bg-zinc-900/90 border-zinc-700/80 text-zinc-300 hover:text-white hover:bg-zinc-800'
             }`}
           >
-            X-Ray
+            {devMode ? 'Live Mode' : 'Dev Sim'}
           </button>
+
+          {/* View Mode Switcher */}
+          <div className="flex rounded-lg border border-zinc-700/80 bg-zinc-900/90 backdrop-blur-md overflow-hidden text-[11px] sm:text-xs shadow-sm">
+            <button
+              onClick={() => setViewMode('xray')}
+              className={`px-2 py-1 font-medium transition-colors ${
+                viewMode === 'xray' ? 'bg-zinc-700 text-white font-semibold' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              X-Ray
+            </button>
+            <button
+              onClick={() => setViewMode('realistic')}
+              className={`px-2 py-1 font-medium transition-colors ${
+                viewMode === 'realistic' ? 'bg-zinc-700 text-white font-semibold' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              Realistic
+            </button>
+          </div>
+
+          {/* Auto-Rotate Toggle */}
           <button
-            onClick={() => setViewMode('realistic')}
-            className={`px-2 py-1 transition-colors ${
-              viewMode === 'realistic' ? 'bg-zinc-700 text-white' : 'bg-zinc-900/80 text-zinc-400 hover:text-white'
+            onClick={() => setAutoRotate(r => !r)}
+            title={autoRotate ? 'Pause Rotation' : 'Auto Rotate'}
+            className={`p-1.5 rounded-lg border backdrop-blur-md transition-all active:scale-95 shadow-sm ${
+              autoRotate
+                ? 'bg-blue-600/30 border-blue-500/60 text-blue-300'
+                : 'bg-zinc-900/90 border-zinc-700/80 text-zinc-400 hover:text-white hover:bg-zinc-800'
             }`}
           >
-            Realistic
+            {autoRotate ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+
+          {/* Reset Camera View */}
+          <button
+            onClick={() => setResetTrigger(t => t + 1)}
+            title="Reset View"
+            className="p-1.5 rounded-lg border border-zinc-700/80 bg-zinc-900/90 backdrop-blur-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all active:scale-95 shadow-sm"
+          >
+            <RotateCcw size={14} />
+          </button>
+
+          {/* Fullscreen / Expand Toggle */}
+          <button
+            onClick={() => setIsFullscreen(f => !f)}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen 3D View'}
+            className={`p-1.5 rounded-lg border backdrop-blur-md transition-all active:scale-95 shadow-sm ${
+              isFullscreen
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                : 'bg-zinc-900/90 border-zinc-700/80 text-zinc-400 hover:text-white hover:bg-zinc-800'
+            }`}
+          >
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
-      {mapping ? (
-        <Canvas camera={{ position: [0, 4, 62], fov: CAM_FOV }}>
-          <color attach="background" args={['#050505']} />
-          <ambientLight intensity={0.5} />
-          <CameraRig />
-          <OrbitControls autoRotate autoRotateSpeed={0.5} makeDefault />
-          <LEDMesh coordsX={mapping.coords_x} coordsY={mapping.coords_y} frameRef={frameRef} devMode={devMode} realistic={viewMode === 'realistic'} />
-        </Canvas>
-      ) : (
-        <div className="flex items-center justify-center h-full text-zinc-500">
-          Loading mapping data...
-        </div>
-      )}
+
+      {/* 3D Canvas or Loading */}
+      <div className="flex-1 w-full h-full min-h-0 relative touch-none">
+        {mapping ? (
+          <Canvas camera={{ position: [0, 4, 62], fov: CAM_FOV }}>
+            <color attach="background" args={['#050505']} />
+            <ambientLight intensity={0.5} />
+            <CameraRig resetTrigger={resetTrigger} />
+            <OrbitControls
+              autoRotate={autoRotate}
+              autoRotateSpeed={0.6}
+              enableDamping={true}
+              dampingFactor={0.05}
+              makeDefault
+            />
+            <LEDMesh
+              coordsX={mapping.coords_x}
+              coordsY={mapping.coords_y}
+              frameRef={frameRef}
+              devMode={devMode}
+              realistic={viewMode === 'realistic'}
+            />
+          </Canvas>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full min-h-[260px] text-zinc-500 gap-2">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs">Loading physical LED mapping...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Touch drag helper prompt (shown subtle on mobile) */}
+      <div className="absolute bottom-2 left-3 pointer-events-none text-[10px] text-zinc-500 bg-zinc-950/60 px-2 py-0.5 rounded backdrop-blur-sm sm:hidden">
+        Drag to rotate • Pinch to zoom
+      </div>
     </div>
   );
 };

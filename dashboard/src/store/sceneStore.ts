@@ -97,6 +97,7 @@ interface SceneState {
   addLayer: (layer: LayerConfig) => void;
   moveLayer: (id: string, direction: 'up' | 'down') => void;
   saveScene: (name: string) => void;
+  removeSavedScene: (name: string) => void;
 }
 
 export const useSceneStore = create<SceneState>()(
@@ -134,7 +135,11 @@ export const useSceneStore = create<SceneState>()(
       }),
       
       saveScene: (name) => set((state) => ({
-        savedScenes: [...state.savedScenes, { name, layers: state.activeLayers }]
+        savedScenes: [...state.savedScenes.filter(s => s.name !== name), { name, layers: state.activeLayers }]
+      })),
+
+      removeSavedScene: (name) => set((state) => ({
+        savedScenes: state.savedScenes.filter((s) => s.name !== name)
       }))
     }),
     {
