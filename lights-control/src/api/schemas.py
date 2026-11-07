@@ -1,8 +1,9 @@
-from typing import Literal, List, Union, Annotated
-from pydantic import BaseModel, Field
+from typing import Literal, List, Union, Annotated, Optional, get_args
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 # --- Base ---
 class BaseLayer(BaseModel):
+    id: Optional[str] = None
     opacity: float = 1.0
     # RESTORED: These now apply to ALL layers
     h_min: float = 0.0
@@ -118,10 +119,40 @@ class ChristmasTreeLayer(BaseLayer):
     star_height: float = 0.08
 
 # Update Union
-EffectConfig = Annotated[
+BuiltInEffectConfig = Annotated[
     Union[SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer,
     FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,ClipLayer, AlienLayer, ChristmasTreeLayer], # <--- Add
     Field(discriminator="type")
+]
+
+# Reserved built-in type names — DynamicPluginLayer must not swallow them,
+# so malformed built-in layers still fail validation with a clean 422.
+_BUILTIN_TYPES = frozenset(
+    arg
+    for cls in (SolidLayer, ChaseLayer, StripesLayer, SnowLayer, FireLayer,
+                FireworkLayer, GameOfLifeLayer, LavaLampLayer, BreathingLayer,
+                ClipLayer, AlienLayer, ChristmasTreeLayer)
+    for arg in get_args(cls.model_fields["type"].annotation)
+)
+
+class DynamicPluginLayer(BaseModel):
+    """Standalone schema for plugins — does NOT force opacity/h_min/h_max."""
+    model_config = ConfigDict(extra="allow")
+    id: Optional[str] = None
+    type: str
+
+    @field_validator("type")
+    @classmethod
+    def _type_not_builtin(cls, v: str) -> str:
+        if v in _BUILTIN_TYPES:
+            raise ValueError(f"'{v}' is a built-in layer type; use its strict schema")
+        return v
+
+# Left-to-right so built-in layers always validate against their strict schema
+# first; anything else falls through to the permissive plugin schema.
+EffectConfig = Annotated[
+    Union[BuiltInEffectConfig, DynamicPluginLayer],
+    Field(union_mode="left_to_right"),
 ]
 
 class SceneRequest(BaseModel):

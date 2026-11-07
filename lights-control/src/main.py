@@ -5,7 +5,7 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -17,6 +17,7 @@ from src.api.schemas import SceneRequest, SolidLayer
 
 from src.engine.compositor import Engine
 from src.scene_store import SceneStore
+from src.plugins.registry import list_plugins_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,22 @@ async def get_scene():
     if current_scene is None:
         return {"layers": []}
     return current_scene
+
+@app.get("/plugins")
+async def get_plugins():
+    """Return metadata and editable parameter specs for all registered plugins."""
+    return {"plugins": list_plugins_metadata()}
+
+@app.patch("/scene/layers/{layer_ref}")
+async def patch_scene_layer(layer_ref: str, updates: dict):
+    """Live-update a running layer's parameters without resetting animation state."""
+    ok = engine.patch_layer(layer_ref, updates)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Layer '{layer_ref}' not found")
+    # Sync authoritative current_scene from engine's active configs
+    global current_scene
+    current_scene = SceneRequest(layers=[eff.config for eff in engine.active_effects])
+    return {"status": "Layer Updated", "layer": layer_ref}
 
 @app.get("/status")
 async def get_status():
