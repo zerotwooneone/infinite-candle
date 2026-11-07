@@ -3,7 +3,7 @@ import { useSceneStore } from '../store/sceneStore';
 import { Sliders, Sparkles, Layers } from 'lucide-react';
 
 export const LayerInspector: React.FC<{ selectedLayerId: string | null }> = ({ selectedLayerId }) => {
-  const { activeLayers, updateLayer } = useSceneStore();
+  const { activeLayers, updateLayer, plugins } = useSceneStore();
   
   if (!selectedLayerId) {
     return (
@@ -17,6 +17,9 @@ export const LayerInspector: React.FC<{ selectedLayerId: string | null }> = ({ s
 
   const layer = activeLayers.find(l => l.id === selectedLayerId);
   if (!layer) return null;
+
+  // Plugin layers own their entire parameter surface — render only what they declared.
+  const pluginDef = plugins[layer.type];
 
   const handleChange = (key: string, value: any) => {
     updateLayer(selectedLayerId, { [key]: value });
@@ -110,7 +113,7 @@ export const LayerInspector: React.FC<{ selectedLayerId: string | null }> = ({ s
         <div className="flex items-center gap-2">
           <Sliders className="w-5 h-5 text-blue-400" />
           <h2 className="text-base sm:text-lg font-bold text-white uppercase tracking-wide">
-            {layer.type} Settings
+            {pluginDef ? pluginDef.name : layer.type} Settings
           </h2>
         </div>
         <span className="text-xs px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-400 border border-blue-800/60 font-mono">
@@ -119,6 +122,65 @@ export const LayerInspector: React.FC<{ selectedLayerId: string | null }> = ({ s
       </div>
       
       <div className="space-y-4 max-h-[380px] sm:max-h-[460px] overflow-y-auto pr-1">
+        {pluginDef ? (
+          <div>
+            <h3 className="text-xs uppercase font-semibold text-blue-400 tracking-wider mb-2 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" /> Plugin Parameters
+            </h3>
+            {pluginDef.description && (
+              <p className="text-xs text-zinc-500 mb-2">{pluginDef.description}</p>
+            )}
+            <div className="bg-zinc-950/50 p-2.5 rounded-lg border border-zinc-800/80">
+              {pluginDef.params.map((p) => {
+                const val = (layer as any)[p.name] ?? p.default;
+                if (p.kind === 'color') {
+                  return renderColorInput(p.name, val, p.label);
+                }
+                if (p.kind === 'float' || p.kind === 'int') {
+                  return renderNumberInput(
+                    p.name,
+                    val,
+                    p.min ?? 0,
+                    p.max ?? 1,
+                    p.step ?? (p.kind === 'int' ? 1 : 0.05),
+                    p.label
+                  );
+                }
+                if (p.kind === 'bool') {
+                  return (
+                    <label key={p.name} className="flex items-center justify-between py-2 border-b border-zinc-800/80 cursor-pointer">
+                      <span className="text-xs font-medium text-zinc-300">{p.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={!!val}
+                        onChange={(e) => handleChange(p.name, e.target.checked)}
+                        className="w-4 h-4 rounded bg-zinc-800 border-zinc-700 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      />
+                    </label>
+                  );
+                }
+                if (p.kind === 'choice') {
+                  return (
+                    <div key={p.name} className="flex items-center justify-between py-2 border-b border-zinc-800/80 gap-3">
+                      <label className="text-xs font-medium text-zinc-300">{p.label}</label>
+                      <select
+                        value={val}
+                        onChange={(e) => handleChange(p.name, e.target.value)}
+                        className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        {(p.options ?? []).map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Base Properties */}
         <div>
           <h3 className="text-xs uppercase font-semibold text-blue-400 tracking-wider mb-2 flex items-center gap-1">
@@ -212,6 +274,8 @@ export const LayerInspector: React.FC<{ selectedLayerId: string | null }> = ({ s
             )}
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

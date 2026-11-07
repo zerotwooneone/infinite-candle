@@ -15,7 +15,7 @@ type MobileTab = 'all' | 'twin' | 'layers' | 'presets';
 function App() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MobileTab>('all');
-  const { setActiveLayers } = useSceneStore();
+  const { setActiveLayers, setPlugins } = useSceneStore();
 
   // Rehydrate from the Pi's authoritative state on mount.
   // The backend is the source of truth — localStorage is just a draft cache.
@@ -24,11 +24,22 @@ function App() {
       .then(r => r.json())
       .then(data => {
         if (data?.layers?.length) {
-          setActiveLayers(data.layers.map((l: any) => ({ ...l, id: generateId() })));
+          setActiveLayers(data.layers.map((l: any) => ({ ...l, id: l.id || generateId() })));
         }
       })
       .catch(e => console.warn('Could not fetch active scene from Pi:', e));
   }, [setActiveLayers]);
+
+  // Discover registered plugins — drives the "+ Add Layer" menu and the
+  // plugin-owned inspector controls.
+  useEffect(() => {
+    fetch(`${API_BASE}/plugins`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data?.plugins)) setPlugins(data.plugins);
+      })
+      .catch(e => console.warn('Could not fetch plugin metadata from Pi:', e));
+  }, [setPlugins]);
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-zinc-950 flex flex-col text-slate-200">

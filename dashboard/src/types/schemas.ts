@@ -110,7 +110,33 @@ export interface ChristmasTreeLayer extends BaseLayer {
   star_height: number;
 }
 
-export type LayerConfig = 
+export interface PluginParamSpec {
+  name: string;
+  label: string;
+  kind: 'float' | 'int' | 'color' | 'bool' | 'choice';
+  default: any;
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+  options?: string[] | null;
+  live: boolean;
+}
+
+export interface PluginDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  params: PluginParamSpec[];
+  defaults: Record<string, any>;
+}
+
+export interface DynamicPluginLayer {
+  id: string; // for UI tracking
+  type: string;
+  [key: string]: any;
+}
+
+export type LayerConfig =
   | SolidLayer
   | ChaseLayer
   | StripesLayer
@@ -122,7 +148,8 @@ export type LayerConfig =
   | BreathingLayer
   | ClipLayer
   | AlienLayer
-  | ChristmasTreeLayer;
+  | ChristmasTreeLayer
+  | DynamicPluginLayer;
 
 export interface SceneRequest {
   layers: LayerConfig[];

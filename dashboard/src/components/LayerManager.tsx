@@ -7,13 +7,23 @@ export const LayerManager: React.FC<{
   selectedLayerId: string | null;
   setSelectedLayerId: (id: string | null) => void;
 }> = ({ selectedLayerId, setSelectedLayerId }) => {
-  const { activeLayers, moveLayer, removeLayer, addLayer } = useSceneStore();
+  const { activeLayers, moveLayer, removeLayer, addLayer, plugins } = useSceneStore();
 
   const handleAdd = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const type = e.target.value;
     if (!type) return;
     
     const id = Math.random().toString(36).substring(2, 9);
+
+    // Plugin layers own their params entirely — only their declared defaults.
+    const pluginDef = plugins[type];
+    if (pluginDef) {
+      addLayer({ id, type, ...pluginDef.defaults } as LayerConfig);
+      setSelectedLayerId(id);
+      e.target.value = '';
+      return;
+    }
+
     let newLayer: any = { id, type, opacity: 1.0, h_min: 0.0, h_max: 1.0 };
     
     if (type === 'solid') newLayer = { ...newLayer, color: [255, 255, 255] };
@@ -69,6 +79,13 @@ export const LayerManager: React.FC<{
             <option value="clip">🎬 Clip (.npy)</option>
             <option value="gol">👾 Game of Life</option>
             <option value="snow">❄️ Snow</option>
+            {Object.keys(plugins).length > 0 && (
+              <optgroup label="Plugins">
+                {Object.values(plugins).map((p) => (
+                  <option key={p.id} value={p.id}>🧩 {p.name}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400">
             <Plus size={14} />
@@ -99,10 +116,11 @@ export const LayerManager: React.FC<{
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider truncate">
-                    {layer.type}
+                    {plugins[layer.type]?.name || layer.type}
                   </span>
                   <span className="text-[11px] text-zinc-400 font-mono">
-                    Layer #{actualIndex + 1} • {Math.round((layer.opacity ?? 1) * 100)}% opac
+                    Layer #{actualIndex + 1}
+                    {layer.opacity !== undefined && ` • ${Math.round(layer.opacity * 100)}% opac`}
                   </span>
                 </div>
               </div>

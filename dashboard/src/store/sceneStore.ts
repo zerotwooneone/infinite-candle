@@ -1,8 +1,32 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { LayerConfig } from '../types/schemas';
+import { LayerConfig, PluginDefinition } from '../types/schemas';
+import { API_BASE } from '../config';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
+// Throttled live-patch: coalesce rapid slider/color edits into PATCH requests
+// (max 1 per PATCH_THROTTLE_MS per layer) so running plugin layers update
+// in-place without an animation restart.
+const PATCH_THROTTLE_MS = 50;
+const patchTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const patchPending = new Map<string, Record<string, any>>();
+
+function queueLayerPatch(id: string, updates: Record<string, any>) {
+  patchPending.set(id, { ...(patchPending.get(id) ?? {}), ...updates });
+  if (patchTimers.has(id)) return;
+  patchTimers.set(id, setTimeout(() => {
+    patchTimers.delete(id);
+    const body = patchPending.get(id);
+    patchPending.delete(id);
+    if (!body) return;
+    fetch(`${API_BASE}/scene/layers/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  }, PATCH_THROTTLE_MS));
+}
 
 export const FACTORY_PRESETS = [
   {
@@ -91,6 +115,8 @@ export const FACTORY_PRESETS = [
 interface SceneState {
   activeLayers: LayerConfig[];
   savedScenes: { name: string; layers: LayerConfig[] }[];
+  plugins: Record<string, PluginDefinition>;
+  setPlugins: (list: PluginDefinition[]) => void;
   setActiveLayers: (layers: LayerConfig[]) => void;
   updateLayer: (id: string, updates: Partial<LayerConfig>) => void;
   removeLayer: (id: string) => void;
@@ -105,12 +131,20 @@ export const useSceneStore = create<SceneState>()(
     (set) => ({
       activeLayers: [],
       savedScenes: [],
-      
+      plugins: {},
+
+      setPlugins: (list) => set({
+        plugins: Object.fromEntries(list.map((p) => [p.id, p]))
+      }),
+
       setActiveLayers: (layers) => set({ activeLayers: layers }),
       
-      updateLayer: (id, updates) => set((state) => ({
-        activeLayers: state.activeLayers.map((l) => (l.id === id ? { ...l, ...updates } : l)) as LayerConfig[]
-      })),
+      updateLayer: (id, updates) => {
+        queueLayerPatch(id, updates as Record<string, any>);
+        set((state) => ({
+          activeLayers: state.activeLayers.map((l) => (l.id === id ? { ...l, ...updates } : l)) as LayerConfig[]
+        }));
+      },
       
       removeLayer: (id) => set((state) => ({
         activeLayers: state.activeLayers.filter((l) => l.id !== id)
@@ -144,6 +178,11 @@ export const useSceneStore = create<SceneState>()(
     }),
     {
       name: 'infinite-candle-storage',
+      // Plugins come from GET /plugins on every load — do not persist them.
+      partialize: (state) => ({
+        activeLayers: state.activeLayers,
+        savedScenes: state.savedScenes,
+      }),
     }
   )
 );

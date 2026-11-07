@@ -12,8 +12,9 @@ export const ActionBar: React.FC = () => {
     setStatus('pushing');
     setErrorMessage('');
     try {
-      // Clean up internal IDs before sending to backend
-      const payload = activeLayers.map(({ id, ...rest }) => rest);
+      // Keep layer `id` so the backend Engine can match and preserve
+      // running plugin instances across scene pushes.
+      const payload = activeLayers;
       
       const res = await fetch(`${API_BASE}/scene`, {
         method: 'POST',
