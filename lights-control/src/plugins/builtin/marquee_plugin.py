@@ -161,8 +161,11 @@ class MarqueeTextPlugin(AnimationPlugin):
         scroll_px = self._scroll_cells(ctx) * cell * direction
 
         # 1. Horizontal: map theta onto strip columns, blending adjacent columns
-        #    so stepped/smooth motion glides instead of flickering.
-        xw = (ctx.leds.theta * px_per_wrap - scroll_px) % width
+        #    so stepped/smooth motion glides instead of flickering. The physical
+        #    winding runs opposite font column order — negate theta so glyphs
+        #    read unmirrored from outside. Travel direction is unchanged
+        #    (content angle = (scroll - col)/P still grows with scroll).
+        xw = (scroll_px - ctx.leds.theta * px_per_wrap) % width
         x0 = np.floor(xw).astype(int)
         frac = xw - x0
         x1 = (x0 + 1) % int(width)
