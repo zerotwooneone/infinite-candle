@@ -97,7 +97,7 @@ export const FACTORY_PRESETS = [
   {
     name: "Rubik's Cube",
     layers: [
-      { id: generateId(), type: 'clip', filename: 'rubiks_solve_loop.npy', transparent: true }
+      { id: generateId(), type: 'rubiks' }
     ]
   },
   {

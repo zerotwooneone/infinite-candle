@@ -216,11 +216,8 @@
 ```json
 {
   "layers": [
-    
     {
-      "type": "clip",
-      "filename": "rubiks_solve_loop.npy",
-      "transparent": true
+      "type": "rubiks"
     }
   ]
 }
