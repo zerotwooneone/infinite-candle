@@ -15,13 +15,14 @@ from src.plugins import toolkit as tk
 class ParamSpec:
     name: str
     label: str
-    kind: Literal["float", "int", "color", "bool", "choice"]
+    kind: Literal["float", "int", "color", "bool", "choice", "text"]
     default: Any
     min: float | None = None
     max: float | None = None
     step: float | None = None
     options: list[str] | None = None
     live: bool = True  # If False, changing this param triggers `on_init()`
+    max_len: int | None = None  # text params only: truncate to this many chars
 
     def coerce(self, value: Any) -> Any:
         if value is None:
@@ -53,6 +54,11 @@ class ParamSpec:
                 if self.options and s not in self.options:
                     return self.default
                 return s
+            if self.kind == "text":
+                s = str(value)
+                if self.max_len is not None:
+                    s = s[: int(self.max_len)]
+                return s
         except (TypeError, ValueError):
             return self.default
         return value
@@ -68,6 +74,7 @@ class ParamSpec:
             "step": self.step,
             "options": self.options,
             "live": self.live,
+            "max_len": self.max_len,
         }
 
 
@@ -89,6 +96,10 @@ def BoolParam(name: str, label: str, default: bool = False, live: bool = True) -
 
 def ChoiceParam(name: str, label: str, options: list[str], default: str, live: bool = True) -> ParamSpec:
     return ParamSpec(name=name, label=label, kind="choice", default=default, options=options, live=live)
+
+
+def TextParam(name: str, label: str, default: str = "", max_len: int = 64, live: bool = True) -> ParamSpec:
+    return ParamSpec(name=name, label=label, kind="text", default=default, live=live, max_len=max_len)
 
 
 # --- Opt-in Reusable Parameter Presets ---

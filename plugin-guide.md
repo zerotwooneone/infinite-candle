@@ -89,6 +89,7 @@ Each `ParamSpec` in `params` maps 1:1 to a dashboard control:
 | `ColorParam(name, label, default=[r,g,b], live=True)` | `color` | color picker | stored as `[r, g, b]` |
 | `BoolParam(name, label, default, live=True)` | `bool` | checkbox | |
 | `ChoiceParam(name, label, options, default, live=True)` | `choice` | dropdown | |
+| `TextParam(name, label, default, max_len=64, live=True)` | `text` | single-line text input | truncated to `max_len` |
 
 - **`live=False`** — changing this param re-runs `on_init()` (e.g. `blob_count`, which re-allocates state arrays). Live params update in place with no animation restart.
 - Values arrive **coerced and clamped** in `self.values[name]` — always read params via `self.values`, never cache them.

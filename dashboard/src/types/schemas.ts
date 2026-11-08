@@ -113,13 +113,14 @@ export interface ChristmasTreeLayer extends BaseLayer {
 export interface PluginParamSpec {
   name: string;
   label: string;
-  kind: 'float' | 'int' | 'color' | 'bool' | 'choice';
+  kind: 'float' | 'int' | 'color' | 'bool' | 'choice' | 'text';
   default: any;
   min?: number | null;
   max?: number | null;
   step?: number | null;
   options?: string[] | null;
   live: boolean;
+  max_len?: number | null;
 }
 
 export interface PluginDefinition {

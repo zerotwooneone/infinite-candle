@@ -159,6 +159,20 @@ export const LayerInspector: React.FC<{ selectedLayerId: string | null }> = ({ s
                     </label>
                   );
                 }
+                if (p.kind === 'text') {
+                  return (
+                    <div key={p.name} className="py-2 border-b border-zinc-800/80">
+                      <label className="text-xs font-medium text-zinc-300 block mb-1">{p.label}</label>
+                      <input
+                        type="text"
+                        value={val ?? ''}
+                        maxLength={p.max_len ?? undefined}
+                        onChange={(e) => handleChange(p.name, e.target.value)}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  );
+                }
                 if (p.kind === 'choice') {
                   return (
                     <div key={p.name} className="flex items-center justify-between py-2 border-b border-zinc-800/80 gap-3">
