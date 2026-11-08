@@ -22,6 +22,8 @@ This is a mono-repo organized into five domains:
 | **[`/dashboard`](./dashboard)** | **The Face.** React + Vite + TypeScript control panel with a React Three Fiber digital twin that mirrors the live LED buffer over WebSocket. |
 | **[`/offline-sim`](./offline-sim)** | **The Bakery.** Offline renderers (NumPy/CuPy) that bake complex effects into `.npy` clip files the engine can play back. |
 
+> 🧩 **Writing a new animation?** Plugins live in `lights-control/src/plugins/builtin/` and need no dashboard or engine changes — see the **[Animation Plugin Guide](./plugin-guide.md)**.
+
 ---
 
 ## 🚀 Getting Started
